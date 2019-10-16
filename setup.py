@@ -6,7 +6,7 @@ setup(
     description="Efficient, lightweight, variational inference approximation bounds",
     author='Jonathan H. Huggins',
     author_email='jhuggins@mit.edu',
-    url='https://github.com/jhhuggins/viabel/',
+    url='https://github.com/jhuggins/viabel/',
     packages=['viabel'],
     install_requires=['numpy'],
     python_requires='>=2.7',
