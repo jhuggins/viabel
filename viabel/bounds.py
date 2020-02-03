@@ -26,7 +26,7 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
     samples : array-like matrix, shape=(n_samples, n_dimensions)
         samples `x_i` associated with log weights
 
-    moment_bound_fn : array-like matrix, shape=(n_variant_types, n_signatures)
+    moment_bound_fn : function
         `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]^(1/p)`.
         It must be provided if `samples` is `None`. Must support `p = 2`
         and `p = 4`.
