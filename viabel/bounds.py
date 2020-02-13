@@ -27,15 +27,15 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
         samples `x_i` associated with log weights
 
     moment_bound_fn : function
-        `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]^(1/p)`.
+        `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]`.
         It must be provided if `samples` is `None`. Must support `p = 2`
         and `p = 4`.
 
-    q_var : float
-        (Bound on) the variance of `q`.
+    q_var : float or array-like matrix
+        (Bound on) the (co)variance of `q`.
 
-    p_var : float
-        (Bound on) the variance of `p`.
+    p_var : float or array-like matrix
+        (Bound on) the (co)variance of `p`.
 
     log_norm_bound : float
         Bound on the overall log normalization constant (the log marginal
@@ -47,14 +47,24 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
     results : dict
         contains the following bounds: `mean_error`, `var_error`, `std_error`,
         `d2`, `W1`, `W2`."""
-    d2 = divergence_bound(log_weights, log_norm_bound=log_norm_bound)
+    d2, log_norm_bound = divergence_bound(log_weights,
+                                          log_norm_bound=log_norm_bound,
+                                          return_log_norm_bound=True)
     results = wasserstein_bounds(d2, samples, moment_bound_fn)
 
     if q_var is None and samples is not None:
-        q_var = np.cov(samples)
+        q_var = np.cov(samples.T)
+
     results.update(error_bounds(q_var=q_var, p_var=p_var, **results))
     results['d2'] = d2
+    results['log_norm_bound'] = log_norm_bound
     return results
+
+
+def _compute_norm_if_needed(var):
+    if np.asarray(var).ndim == 2:
+        return np.linalg.norm(var, ord=2)
+    return var
 
 
 def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
@@ -72,11 +82,11 @@ def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
     W2 : float
         (Bound on) the 2-Wasserstein distance between `p` and `q`.
 
-    q_var : float
-        (Bound on) the variance of `q`.
+    q_var : float or array-like matrix
+        (Bound on) the (co)variance of `q`.
 
-    p_var : float
-        (Bound on) the variance of `p`.
+    p_var : float or array-like matrix
+        (Bound on) the (co)variance of `p`.
 
     Returns
     -------
@@ -85,7 +95,8 @@ def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
     results = dict()
     results['mean_error'] = mean_bound(min(W1, W2))
     results['std_error'] = std_bound(W2)
-    results['var_error'] = var_bound(W2, q_var, p_var)
+    results['cov_error'] = var_bound(W2, _compute_norm_if_needed(q_var),
+                                     _compute_norm_if_needed(p_var))
     return results
 
 
@@ -104,7 +115,7 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
         samples from `q`.
 
     moment_bound_fn : array-like matrix, shape=(n_variant_types, n_signatures)
-        `moment_bound_fn(a)` should return a bound on `min_y E[(x_i - y)^a]^(1/a)`.
+        `moment_bound_fn(a)` should return a bound on `min_y E[(x_i - y)^a]`.
         It must be provided if `samples` is `None`. Must support `a = 2`
         and `a = 4`.
 
@@ -121,14 +132,15 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
             samples = samples[:,np.newaxis]
         sample_mean = np.mean(samples, axis=0, keepdims=True)
         centered_samples = samples - sample_mean
-        moment_bound_fn = lambda p: np.mean(np.sum(centered_samples**p, axis=1))**(1/p)
+        moment_bound_fn = lambda p: np.mean(np.sum(centered_samples**p, axis=1))
     for p in [1, 2]:
         Cp = moment_bound_fn(2*p)
-        results['W{}'.format(p)] = 2 * Cp * np.expm1(d2)**(.5/p)
+        results['W{}'.format(p)] = 2 * Cp**(.5/p) * np.expm1(d2)**(.5/p)
     return results
 
 
-def divergence_bound(log_weights, alpha=2., log_norm_bound=None):
+def divergence_bound(log_weights, alpha=2., log_norm_bound=None,
+                     return_log_norm_bound=False):
     """Compute a bound on the alpha-divergence.
 
     Compute error and distance bounds between distribution `p` and `q` using
@@ -162,11 +174,13 @@ def divergence_bound(log_weights, alpha=2., log_norm_bound=None):
     if log_norm_bound is None:
         log_norm_bound = mean_and_check_mc_error(log_weights,
                                                  quantity_name='ELBO')
-        print('log norm bound =', log_norm_bound)
-    return alpha / (alpha - 1) * (cubo - log_norm_bound)
+    dalpha = alpha / (alpha - 1) * (cubo - log_norm_bound)
+    if return_log_norm_bound:
+        return dalpha, log_norm_bound
+    return dalpha
 
 
-def mean_and_check_mc_error(a, atol=0.001, rtol=0.0, quantity_name=None):
+def mean_and_check_mc_error(a, atol=0.01, rtol=0.0, quantity_name=None):
     m = np.mean(a)
     s = np.std(a)/np.sqrt(a.size)
     if s > rtol*np.abs(m) + atol:

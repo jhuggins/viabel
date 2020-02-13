@@ -21,7 +21,8 @@ Jonathan H. Huggins,
 Miko&#0322;aj Kasprzak,
 Trevor Campbell,
 Tamara Broderick.
-*arXiv:1910.04102 [stat.ML]*, 2019.
+In *Proc. of the 23rd International Conference on Artificial Intelligence and
+Statistics* (AISTATS), Palermo, Italy. PMLR: Volume 108, 2020.
 
 ## Compilation and testing
 
