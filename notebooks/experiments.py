@@ -13,10 +13,46 @@ from psis import psislw
 
 def print_bounds(results):
     print('Bounds on...')
-    print('  2-Wasserstein: {:.3g}'.format(results['W2']))
-    print('  2-divergence:  {:.3g}'.format(results['d2']))
-    print('  mean error:    {:.3g}'.format(results['mean_error']))
-    print('  stdev error:   {:.3g}'.format(results['std_error']))
+    print('  2-Wasserstein   {:.3g}'.format(results['W2']))
+    print('  2-divergence    {:.3g}'.format(results['d2']))
+    print('  mean error      {:.3g}'.format(results['mean_error']))
+    print('  stdev error     {:.3g}'.format(results['std_error']))
+    print('  sqrt cov error  {:.3g}'.format(np.sqrt(results['cov_error'])))
+    print('  cov error       {:.3g}'.format(results['cov_error']))
+
+
+## Check approximation accuracy ##
+
+def check_accuracy(true_mean, true_cov, approx_mean, approx_cov, verbose=False,
+                   method=None):
+    true_std = np.sqrt(np.diag(true_cov))
+    approx_std = np.sqrt(np.diag(approx_cov))
+    results = dict(mean_error=np.linalg.norm(true_mean - approx_mean),
+                   cov_error_2=np.linalg.norm(true_cov - approx_cov, ord=2),
+                   cov_norm_2=np.linalg.norm(true_cov, ord=2),
+                   cov_error_nuc=np.linalg.norm(true_cov - approx_cov, ord='nuc'),
+                   cov_norm_nuc=np.linalg.norm(true_cov, ord='nuc'),
+                   std_error=np.linalg.norm(true_std - approx_std),
+                   rel_std_error=np.linalg.norm(approx_std/true_std - 1),
+                  )
+    if method is not None:
+        results['method'] = method
+    if verbose:
+        print('mean   =', approx_mean)
+        print('stdevs =', approx_std)
+        print()
+        print('mean error             = {:.3g}'.format(results['mean_error']))
+        print('stdev error            = {:.3g}'.format(results['std_error']))
+        print('||cov error||_2^{{1/2}}  = {:.3g}'.format(np.sqrt(results['cov_error_2'])))
+        print('||true cov||_2^{{1/2}}   = {:.3g}'.format(np.sqrt(results['cov_norm_2'])))
+    return results
+
+
+def check_approx_accuracy(var_family, var_param, true_mean, true_cov,
+                          verbose=False, name=None):
+    return check_accuracy(true_mean, true_cov,
+                          *var_family.mean_and_cov(var_param),
+                          verbose, name)
 
 
 ## Convenience functions and PSIS ##
@@ -40,6 +76,7 @@ def improve_with_psis(logdensity, var_family, var_param, n_samples,
                                          var_param, n_samples)
     if verbose:
         print('khat = {:.3g}'.format(khat))
+        print()
     if transform is not None:
         samples = transform(samples)
     slw -= np.max(slw)
@@ -52,40 +89,6 @@ def improve_with_psis(logdensity, var_family, var_param, n_samples,
     return res, approx_mean, approx_cov
 
 
-## Check approximation accuracy ##
-
-def check_accuracy(true_mean, true_cov, approx_mean, approx_cov, verbose=False,
-                   method=None):
-    true_std = np.sqrt(np.diag(true_cov))
-    approx_std = np.sqrt(np.diag(approx_cov))
-    results = dict(mean_error=np.linalg.norm(true_mean - approx_mean),
-                   cov_error_2=np.linalg.norm(true_cov - approx_cov, ord=2),
-                   cov_norm_2=np.linalg.norm(true_cov, ord=2),
-                   cov_error_nuc=np.linalg.norm(true_cov - approx_cov, ord='nuc'),
-                   cov_norm_nuc=np.linalg.norm(true_cov, ord='nuc'),
-                   std_error=np.linalg.norm(true_std - approx_std),
-                   rel_std_error=np.linalg.norm(approx_std/true_std - 1),
-                  )
-    if method is not None:
-        results['method'] = method
-    if verbose:
-        print('mean   =', approx_mean)
-        print('stdevs =', approx_std)
-        print('mean error       = {:.3g}'.format(results['mean_error']))
-        print('||cov error||_2  = {:.3g}'.format(results['cov_error_2']))
-        print('||true_cov||_2   = {:.3g}'.format(results['cov_norm_2']))
-        print('stdev error      = {:.3g}'.format(results['std_error']))
-        print('rel. std error   = {:.3g}'.format(results['rel_std_error']))
-    return results
-
-
-def check_approx_accuracy(var_family, var_param, true_mean, true_cov,
-                          verbose=False, name=None):
-    return check_accuracy(true_mean, true_cov,
-                          *var_family.mean_and_cov(var_param),
-                          verbose, name)
-
-
 ## Plotting ##
 
 def plot_approx_and_exact_contours(logdensity, var_family, var_param,
@@ -93,9 +96,12 @@ def plot_approx_and_exact_contours(logdensity, var_family, var_param,
     xlist = np.linspace(*xlim, 100)
     ylist = np.linspace(*ylim, 100)
     X, Y = np.meshgrid(xlist, ylist)
-    XY = np.concatenate([X[:,:,np.newaxis], Y[:,:,np.newaxis]], axis=2)
-    Z = np.exp(logdensity(XY))
-    Zapprox = np.exp(var_family.logdensity(XY, var_param))
+    # XY = np.concatenate([X[:,:,np.newaxis], Y[:,:,np.newaxis]], axis=2)
+    XY = np.concatenate([np.atleast_2d(X.ravel()), np.atleast_2d(Y.ravel())]).T
+    zs = np.exp(logdensity(XY))
+    Z = zs.reshape(X.shape)
+    zsapprox = np.exp(var_family.logdensity(XY, var_param))
+    Zapprox = zsapprox.reshape(X.shape)
     plt.contour(X, Y, Z, colors='k', linestyles='solid')
     plt.contour(X, Y, Zapprox, colors='r', linestyles='solid')
     plt.show()
@@ -143,7 +149,8 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
             n_samples = 1000000
         else:
             n_samples = bound_w2
-        with Timer('Computing CUBO and ELBO'):
+        print()
+        with Timer('Computing CUBO and ELBO with {} samples'.format(n_samples)):
             model_param_samples, log_weights = \
                 get_samples_and_log_weights(logdensity, var_family, opt_param,
                                             n_samples)
@@ -153,14 +160,17 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
                                             q_var=var_dist_cov,
                                             log_norm_bound=elbo))
         if verbose:
-            print('using {} samples to compute bounds'.format(n_samples))
+            print()
             print_bounds(other_results)
     if plot_contours:
         plot_approx_and_exact_contours(logdensity, var_family, opt_param,
                                        **contour_kws)
     if use_psis:
+        print()
+        print('Results with PSIS correction')
+        print('----------------------------')
         other_results['psis_results'], _, _ = \
-            improve_with_psis(logdensity, var_family, opt_param, n_samples,
+            improve_with_psis(logdensity, var_family, opt_param, n_psis_samples,
                               true_mean, true_cov, verbose=verbose)
     return accuracy_results, other_results
 
@@ -176,12 +186,17 @@ def run_experiment(logdensity, var_family, init_param, true_mean, true_cov,
         plot_approx_and_exact_contours(logdensity, var_family, init_param,
                                        **kwargs.get('contour_kws', dict()))
 
-    print('Running KLVI...', flush=True)
+    print('|--------------|')
+    print('|     KLVI     |')
+    print('|--------------|', flush=True)
     kl_results, other_kl_results = _optimize_and_check_results(
         logdensity, var_family, klvi, init_param,
         true_mean, true_cov, plot_contours, '-ELBO', **kwargs)
     kl_results['method'] = 'KLVI'
-    print('Running CHIVI...', flush=True)
+    print()
+    print('|---------------|')
+    print('|     CHIVI     |')
+    print('|---------------|', flush=True)
     elbo = other_kl_results['log_norm_bound']
     chivi_results, other_chivi_results = _optimize_and_check_results(
         logdensity, var_family, chivi, init_param, true_mean, true_cov,
