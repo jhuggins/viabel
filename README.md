@@ -37,11 +37,6 @@ Statistics* (AISTATS), Palermo, Italy. PMLR: Volume 108, 2020.
 ## Compilation and testing
 
 After cloning the repository, testing and installation is easy.
-To test the package:
-```bash
-nosetests tests/
-```
-
 If you just want to compute bounds, you can install using the command
 ```bash
 pip install .
@@ -59,10 +54,16 @@ pip install .[examples]
 ```
 This will install even more dependencies.
 
+To test the package:
+```bash
+nosetests tests/
+```
+Currently there is only coverage for `viabel.bounds`.
+
 ## Usage Examples
 
 Basic usage examples of the bounds are provided in
-[gaussian-location-model-example.ipynb](notebooks/gaussian-location-model-example.ipynb).
+[normal-mixture-model-example.ipynb](notebooks/normal-mixture-model-example.ipynb).
 
 A more involved example that demonstrates how to use the variational Bayes functionality
 and then compute bounds is provided in [robust-regression-model-example.ipynb](notebooks/robust-regression-model-example.ipynb).
