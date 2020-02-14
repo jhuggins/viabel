@@ -151,13 +151,13 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
             n_samples = bound_w2
         print()
         with Timer('Computing CUBO and ELBO with {} samples'.format(n_samples)):
-            model_param_samples, log_weights = \
-                get_samples_and_log_weights(logdensity, var_family, opt_param,
-                                            n_samples)
+            _, log_weights = get_samples_and_log_weights(
+                logdensity, var_family, opt_param, n_samples)
             var_dist_cov = var_family.mean_and_cov(opt_param)[1]
+            moment_bound_fn = lambda p: var_family.pth_moment(p, opt_param)
             other_results.update(all_bounds(log_weights,
-                                            model_param_samples,
                                             q_var=var_dist_cov,
+                                            moment_bound_fn=moment_bound_fn,
                                             log_norm_bound=elbo))
         if verbose:
             print()

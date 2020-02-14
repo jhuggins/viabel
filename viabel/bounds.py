@@ -28,7 +28,7 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
 
     moment_bound_fn : function
         `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]`.
-        It must be provided if `samples` is `None`. Must support `p = 2`
+        It must be provided if `samples` is `None` and it must support `p = 2`
         and `p = 4`.
 
     q_var : float or array-like matrix
