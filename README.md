@@ -1,4 +1,4 @@
-#  viabel: Variational Inference Approximation Bounds that are Efficient and Lightweight
+#  `viabel`: Variational Inference Approximation Bounds that are Efficient and Lightweight
 
 ## Description
 

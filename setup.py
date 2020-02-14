@@ -3,9 +3,9 @@ from distutils.core import setup
 setup(
     name = 'viabel',
     version='0.2',
-    description="Efficient, lightweight, variational inference approximation bounds",
+    description='Efficient, lightweight, variational inference and approximation bounds',
     author='Jonathan H. Huggins',
-    author_email='jhuggins@mit.edu',
+    author_email='huggins@bu.edu',
     url='https://github.com/jhuggins/viabel/',
     packages=['viabel'],
     install_requires=['numpy'],
