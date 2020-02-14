@@ -63,7 +63,7 @@ Currently there is only coverage for `viabel.bounds`.
 ## Usage Examples
 
 Basic usage examples of the bounds are provided in
-[normal-mixture-model-example.ipynb](notebooks/normal-mixture-model-example.ipynb).
+[normal-mixture-example.ipynb](notebooks/normal-mixture-example.ipynb).
 
 A more involved example that demonstrates how to use the variational Bayes functionality
 and then compute bounds is provided in [robust-regression-model-example.ipynb](notebooks/robust-regression-model-example.ipynb).
