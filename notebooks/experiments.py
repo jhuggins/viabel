@@ -92,18 +92,20 @@ def improve_with_psis(logdensity, var_family, var_param, n_samples,
 ## Plotting ##
 
 def plot_approx_and_exact_contours(logdensity, var_family, var_param,
-                                   xlim=[-10,10], ylim=[-3, 3]):
+                                   xlim=[-10,10], ylim=[-3, 3],
+                                   cmap2='Reds', savepath=None):
     xlist = np.linspace(*xlim, 100)
     ylist = np.linspace(*ylim, 100)
     X, Y = np.meshgrid(xlist, ylist)
-    # XY = np.concatenate([X[:,:,np.newaxis], Y[:,:,np.newaxis]], axis=2)
     XY = np.concatenate([np.atleast_2d(X.ravel()), np.atleast_2d(Y.ravel())]).T
     zs = np.exp(logdensity(XY))
     Z = zs.reshape(X.shape)
     zsapprox = np.exp(var_family.logdensity(XY, var_param))
     Zapprox = zsapprox.reshape(X.shape)
-    plt.contour(X, Y, Z, colors='k', linestyles='solid')
-    plt.contour(X, Y, Zapprox, colors='r', linestyles='solid')
+    plt.contour(X, Y, Z, cmap='Greys', linestyles='solid')
+    plt.contour(X, Y, Zapprox, cmap=cmap2, linestyles='solid')
+    if savepath is not None:
+        plt.savefig(savepath, bbox_inches='tight')
     plt.show()
 
 
@@ -131,16 +133,15 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
                                 n_psis_samples=1000000, **kwargs):
     opt_param, var_param_history, value_history, _ = \
         adagrad_optimize(n_iters, objective_and_grad, init_var_param, **kwargs)
-    smoothed_opt_param = np.mean(var_param_history, axis=0)
-    plt.plot(np.linalg.norm(var_param_history - smoothed_opt_param[np.newaxis,:], axis=1))
+    plt.plot(np.linalg.norm(var_param_history - opt_param[np.newaxis,:], axis=1))
     plt.title('iteration vs distance to smoothed optimal parameter')
     plt.xlabel('iteration')
     plt.ylabel('distance')
     sns.despine()
     plt.show()
     plt.close()
-    accuracy_results = check_approx_accuracy(var_family, opt_param, true_mean,
-                                             true_cov, verbose);
+    accuracy_results = check_approx_accuracy(var_family, opt_param,
+                                             true_mean, true_cov, verbose);
     other_results = dict(opt_param=opt_param,
                          var_param_history=var_param_history,
                          value_history=value_history)
