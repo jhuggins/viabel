@@ -28,7 +28,7 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
 
     moment_bound_fn : function
         `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]`.
-        It must be provided if `samples` is `None`. Must support `p = 2`
+        It must be provided if `samples` is `None` and it must support `p = 2`
         and `p = 4`.
 
     q_var : float or array-like matrix
@@ -192,7 +192,6 @@ def mean_and_check_mc_error(a, atol=0.01, rtol=0.0, quantity_name=None):
     return m
 
 
-_std_bound_const = .5*(np.sqrt(2) + np.sqrt(6))
 _var_bound_const_1 = 2*np.sqrt(2)
 _var_bound_const_2 = 1 + 3*np.sqrt(2)
 
@@ -202,7 +201,7 @@ def mean_bound(Wp):
 
 
 def std_bound(W2):
-    return _std_bound_const * W2
+    return W2
 
 
 def var_bound(W2, var1, var2=None):
@@ -211,4 +210,4 @@ def var_bound(W2, var1, var2=None):
     else:
         min_var = var1
     min_std = np.sqrt(min_var)
-    return _var_bound_const_1 * min_std * W2 + _var_bound_const_2 * W2**2
+    return 2 * (min_std * W2 + W2**2)

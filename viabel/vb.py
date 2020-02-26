@@ -8,6 +8,7 @@ import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.t as t_dist
 from autograd.scipy.linalg import sqrtm
+from scipy.linalg import eigvalsh
 
 from paragami import (PatternDict,
                       NumericVectorPattern,
@@ -31,7 +32,7 @@ __all__ = [
 VariationalFamily = namedtuple('VariationalFamily',
                                ['sample', 'entropy',
                                 'logdensity', 'mean_and_cov',
-                                'var_param_dim'])
+                                'pth_moment', 'var_param_dim'])
 
 
 def mean_field_gaussian_variational_family(dim):
@@ -57,7 +58,18 @@ def mean_field_gaussian_variational_family(dim):
         mean, log_std = unpack_params(var_param)
         return mean, np.diag(np.exp(2*log_std))
 
-    return VariationalFamily(sample, entropy, logdensity, mean_and_cov, 2*dim)
+    def pth_moment(p, var_param):
+        if p not in [2,4]:
+            raise ValueError('only p = 2 or 4 supported')
+        _, log_std = unpack_params(var_param)
+        vars = np.exp(2*log_std)
+        if p == 2:
+            return np.sum(vars)
+        else:  # p == 4
+            return 2*np.sum(vars**2) + np.sum(vars)**2
+
+    return VariationalFamily(sample, entropy, logdensity,
+                             mean_and_cov, pth_moment, 2*dim)
 
 
 def mean_field_t_variational_family(dim, df):
@@ -86,9 +98,23 @@ def mean_field_t_variational_family(dim, df):
 
     def mean_and_cov(var_param):
         mean, log_scale = unpack_params(var_param)
-        return mean, df / (df - 2.) * np.diag(np.exp(2*log_scale))
+        return mean, df / (df - 2) * np.diag(np.exp(2*log_scale))
 
-    return VariationalFamily(sample, entropy, logdensity, mean_and_cov, 2*dim)
+    def pth_moment(p, var_param):
+        if p not in [2,4]:
+            raise ValueError('only p = 2 or 4 supported')
+        if df <= p:
+            raise ValueError('df must be greater than p')
+        _, log_scale = unpack_params(var_param)
+        scales = np.exp(log_scale)
+        c = df / (df - 2)
+        if p == 2:
+            return c*np.sum(scales**2)
+        else:  # p == 4
+            return c**2*(2*(df-1)/(df-4)*np.sum(scales**4) + np.sum(scales**2)**2)
+
+    return VariationalFamily(sample, entropy, logdensity,
+                             mean_and_cov, pth_moment, 2*dim)
 
 
 def _get_mu_sigma_pattern(dim):
@@ -125,8 +151,21 @@ def t_variational_family(dim, df):
         param_dict = ms_pattern.fold(var_param)
         return param_dict['mu'], df / (df - 2.) * param_dict['Sigma']
 
+    def pth_moment(p, var_param):
+        if p not in [2,4]:
+            raise ValueError('only p = 2 or 4 supported')
+        if df <= p:
+            raise ValueError('df must be greater than p')
+        param_dict = ms_pattern.fold(var_param)
+        sq_scales = np.linalg.eigvalsh(param_dict['Sigma'])
+        c = df / (df - 2)
+        if p == 2:
+            return c*np.sum(sq_scales)
+        else:  # p == 4
+            return c**2*(2*(df-1)/(df-4)*np.sum(sq_scales**2) + np.sum(sq_scales)**2)
+
     return VariationalFamily(sample, entropy, logdensity, mean_and_cov,
-                             ms_pattern.flat_length(True))
+                             pth_moment, ms_pattern.flat_length(True))
 
 
 def black_box_klvi(var_family, logdensity, n_samples):
