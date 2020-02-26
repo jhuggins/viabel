@@ -275,7 +275,6 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
                 scaled_grads = grad_scale[:,np.newaxis]*np.array(local_grad_history)
                 accum_sum = np.sum(scaled_grads**2, axis=0)
                 variational_param = variational_param - curr_learning_rate*obj_grad/np.sqrt(epsilon + accum_sum)
-                variational_param_history.append(variational_param.copy())
                 if i >= 3*n_iters // 4:
                     variational_param_history.append(variational_param.copy())
                 if i % 10 == 0:
@@ -287,7 +286,7 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
             progress.close()
         finally:
             progress.close()
-        variational_param_history = np.array(variational_param_history)
-        smoothed_opt_param = np.mean(variational_param_history, axis=0)
-        return (smoothed_opt_param, variational_param_history,
+    variational_param_history = np.array(variational_param_history)
+    smoothed_opt_param = np.mean(variational_param_history, axis=0)
+    return (smoothed_opt_param, variational_param_history,
             np.array(value_history), np.array(log_norm_history))
