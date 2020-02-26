@@ -191,15 +191,19 @@ def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
     if learning_rate_end is not None:
         if learning_rate <= learning_rate_end:
             raise ValueError('initial learning rate must be greater than final learning rate')
-        # constant learning rate for first half, then decay like a/(b + i)
+        # constant learning rate for first quarter, then decay like a/(b + i)
+        # for middle half, then constant for last quarter
         b = n_iters*learning_rate_end/(2*(learning_rate - learning_rate_end))
         a = learning_rate*b
-        start_decrease_at = n_iters//2
+        start_decrease_at = n_iters//4
+        end_decrease_at = 3*n_iters//4
     for i in range(n_iters):
         if learning_rate_end is None or i < start_decrease_at:
             yield learning_rate
-        else:
+        elif i < end_decrease_at:
             yield a / (b + i - start_decrease_at + 1)
+        else:
+            yield learning_rate_end
 
 
 def adagrad_optimize(n_iters, objective_and_grad, init_param,
@@ -233,8 +237,8 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
                 accum_sum = np.sum(scaled_grads**2, axis=0)
                 variational_param = variational_param - curr_learning_rate*obj_grad/np.sqrt(epsilon + accum_sum)
                 variational_param_history.append(variational_param.copy())
-                if len(variational_param_history) > 100*window:
-                    variational_param_history.pop(0)
+                if i >= 3*n_iters // 4:
+                    variational_param_history.append(variational_param.copy())
                 if i % 10 == 0:
                     avg_loss = np.mean(value_history[max(0, i - 1000):i + 1])
                     progress.set_description(
@@ -244,5 +248,7 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
             progress.close()
         finally:
             progress.close()
-    return (variational_param, np.array(variational_param_history),
+        variational_param_history = np.array(variational_param_history)
+        smoothed_opt_param = np.mean(variational_param_history, axis=0)
+        return (smoothed_opt_param, variational_param_history,
             np.array(value_history), np.array(log_norm_history))
