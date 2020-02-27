@@ -63,7 +63,15 @@ Currently there is only coverage for `viabel.bounds`.
 ## Usage Examples
 
 Basic usage examples of the bounds are provided in
-[normal-mixture-example.ipynb](notebooks/normal-mixture-example.ipynb).
+[normal-mixture.ipynb](notebooks/normal-mixture.ipynb).
 
 A more involved example that demonstrates how to use the variational Bayes functionality
-and then compute bounds is provided in [robust-regression-model-example.ipynb](notebooks/robust-regression-model-example.ipynb).
+and then compute bounds is provided in [robust-regression.ipynb](notebooks/robust-regression.ipynb).
+
+## Running Comparison Experiments
+
+The [notebooks](notebooks) directory also contains additional functionality for running experiments and computing PSIS-corrected posterior estimates
+in [experiments.py](notebooks/experiments.py).
+[robust-regression.ipynb](notebooks/robust-regression.ipynb) uses some of this functionality.
+A simple example of how to use the high-level `run_experiment` function is provided in [funnel-distributions.ipynb](notebooks/funnel-distributions.ipynb).
+A more intricate example is [eight-schools.ipynb](notebooks/eight-schools.ipynb)

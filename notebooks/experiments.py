@@ -123,6 +123,15 @@ def plot_history(history, B=None, ylabel=None):
     plt.show()
 
 
+def plot_dist_to_opt_param(var_param_history, opt_param):
+    plt.plot(np.linalg.norm(var_param_history - opt_param[np.newaxis,:], axis=1))
+    plt.title('iteration vs distance to optimal parameter')
+    plt.xlabel('iteration')
+    plt.ylabel('distance')
+    sns.despine()
+    plt.show()
+
+
 ## Run experiment with both KLVI and CHIVI ##
 
 def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
@@ -133,13 +142,7 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
                                 n_psis_samples=1000000, **kwargs):
     opt_param, var_param_history, value_history, _ = \
         adagrad_optimize(n_iters, objective_and_grad, init_var_param, **kwargs)
-    plt.plot(np.linalg.norm(var_param_history - opt_param[np.newaxis,:], axis=1))
-    plt.title('iteration vs distance to smoothed optimal parameter')
-    plt.xlabel('iteration')
-    plt.ylabel('distance')
-    sns.despine()
-    plt.show()
-    plt.close()
+    plot_dist_to_opt_param(var_param_history, opt_param)
     accuracy_results = check_approx_accuracy(var_family, opt_param,
                                              true_mean, true_cov, verbose);
     other_results = dict(opt_param=opt_param,
