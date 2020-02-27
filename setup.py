@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name = 'viabel',
-    version='0.2',
+    version='0.3',
     description='Efficient, lightweight, variational inference and approximation bounds',
     author='Jonathan H. Huggins',
     author_email='huggins@bu.edu',
