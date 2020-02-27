@@ -73,5 +73,5 @@ how to use the variational Bayes functionality and then compute bounds.
 The [notebooks/experiments.py](notebooks/experiments.py) contains additional
 functionality for running experiments and computing PSIS-corrected posterior estimates.
 The [robust regression example](notebooks/robust-regression.ipynb) uses some of this functionality.
-A simple [funnel distribution example](notebooks/funnel-distributions.ipynb) demonstrates how to use the high-level `run_experiment` function.
+A simple [funnel distribution example](notebooks/funnel-distribution.ipynb) demonstrates how to use the high-level `run_experiment` function.
 The [eight schools example](notebooks/eight-schools.ipynb) is more involved and realistic.
