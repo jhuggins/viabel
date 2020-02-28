@@ -34,31 +34,15 @@ Tamara Broderick.
 In *Proc. of the 23rd International Conference on Artificial Intelligence and
 Statistics* (AISTATS), Palermo, Italy. PMLR: Volume 108, 2020.
 
-## Compilation and testing
+## How to install
 
-After cloning the repository, testing and installation is easy.
-If you just want to compute bounds, you can install using the command
-```bash
-pip install .
-```
-The only dependency is `numpy`. If you want to use the basic variational Bayes
-functionality, use the command
-```bash
-pip install .[vb]
-```
+If you just want to compute bounds, just run `pip install viabel`.
+The only dependency is `numpy`.
+If you want to use the basic variational Bayes
+functionality, run `pip install viabel[vb]`.
 This will install some additional dependencies.
 If in addition to the above, you want to run all of the [example notebooks](notebooks),
-use the command
-```bash
-pip install .[examples]
-```
-This will install even more dependencies.
-
-To test the package:
-```bash
-nosetests tests/
-```
-Currently there is only coverage for `viabel.bounds`.
+use the command `pip install viabel[vb]`, which will install even more dependencies.
 
 ## Usage Examples
 
@@ -75,3 +59,8 @@ functionality for running experiments and computing PSIS-corrected posterior est
 The [robust regression example](notebooks/robust-regression.ipynb) uses some of this functionality.
 A simple [funnel distribution example](notebooks/funnel-distribution.ipynb) demonstrates how to use the high-level `run_experiment` function.
 The [eight schools example](notebooks/eight-schools.ipynb) is more involved and realistic.
+
+## Development and testing
+
+After cloning the git repository, run `nosetests` to test the package.
+Currently there is only coverage for `viabel.bounds`.
