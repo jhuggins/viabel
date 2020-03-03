@@ -26,7 +26,7 @@ and full-rank Student's t variational families.
 
 If you use this package, please cite:
 
-[Practical posterior error bounds from variational objectives](https://arxiv.org/abs/1910.04102).
+[Validated Variational Inference via Practical Posterior Error Bounds](https://arxiv.org/abs/1910.04102).
 Jonathan H. Huggins,
 Miko&#0322;aj Kasprzak,
 Trevor Campbell,
