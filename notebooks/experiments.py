@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 all
 from viabel import all_bounds
-from viabel.vb import black_box_klvi, black_box_chivi, adagrad_optimize
+from viabel.vb import black_box_klvi, black_box_chivi
+from viabel.optimizers import adagrad_optimize
 from utils import Timer
 from psis import psislw
 

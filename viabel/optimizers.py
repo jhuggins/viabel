@@ -105,7 +105,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                      has_log_norm=False, window=10,learning_rate=.01, learning_rate_end=None,
                      epsilon=.1, tolerance=0.05, eval_elbo=100,  stopping_rule=1, n_optimizers=1,
                      r_mean_threshold=1.20, r_sigma_threshold=1.20,
-                     tail_avg_iters=200, plotting= False):
+                     tail_avg_iters=200, plotting= False, model_name=None):
     log_norm_history = []
     variational_param = init_param.copy()
     prev_elbo = 0.
@@ -315,12 +315,15 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         r_sigma_threshold=1.20, tail_avg_iters=200,
                         eval_elbo=100, tolerance=0.01, stopping_rule=1, avg_grad_norm=False,
                         learning_rate_end=None, plotting=False, model_name=None):
-    '''
+    """
     stopping rule 1 means traditional ELBO stopping rule, while
     stopping rule 2 means MCSE stopping rule.
+
+    The windowed RMSProp optimizer with the convergence diagnostics and iterate averaging ...
+
     :param n_iters:
     :param objective_and_grad:
-    :param init_param:
+    :param init_param: initial params
     :param K:
     :param has_log_norm:
     :param window:
@@ -340,7 +343,7 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
     :param plotting:
     :param model_name:
     :return:
-    '''
+    """
     value_history = []
     log_norm_history = []
     variational_param = init_param.copy()
@@ -611,7 +614,37 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         has_log_norm=False, window=100,  learning_rate=.01,learning_rate_end=None,
                         epsilon=.02, averaging=True, n_optimisers=1,
                         r_mean_threshold=1.20, r_sigma_threshold=1.20, tail_avg_iters=200,
-                        eval_elbo=100, tolerance=0.01, stopping_rule=1, plotting=True):
+                        eval_elbo=100, tolerance=0.01, stopping_rule=1, plotting=True, model_name=None):
+
+    """
+    stopping rule 1 means traditional ELBO stopping rule, while
+    stopping rule 2 means MCSE stopping rule.
+
+    The windowed RMSProp optimizer with the convergence diagnostics and iterate averaging ...
+
+    :param n_iters:
+    :param objective_and_grad:
+    :param init_param: initial params
+    :param K:
+    :param has_log_norm:
+    :param window:
+    :param learning_rate:
+    :param epsilon:
+    :param rhat_window:
+    :param averaging:
+    :param n_optimisers:
+    :param r_mean_threshold:
+    :param r_sigma_threshold:
+    :param tail_avg_iters:
+    :param eval_elbo:
+    :param tolerance:
+    :param stopping_rule:
+    :param avg_grad_norm:
+    :param learning_rate_end:
+    :param plotting:
+    :param model_name:
+    :return:
+    """
 
     optimisation_log = {}
     variational_param_post_conv_history_list=[]
