@@ -9,17 +9,32 @@ import matplotlib.pyplot as plt
 
 import tqdm
 import scipy.stats as stats
-from  .optimization_diagnostics import autocorrelation, monte_carlo_se, monte_carlo_se2, compute_khat_iterates, \
-    gpdfit, montecarlo_se, compute_R_hat, compute_R_hat_halfway, compute_R_hat_halfway_light
+from  .optimization_diagnostics import autocorrelation, monte_carlo_se_moving, compute_khat_iterates, \
+    gpdfit, monte_carlo_se, compute_R_hat, compute_R_hat_window, compute_R_hat_moving
 
 
 __all__ = [
+    'adagrad_optimize',
     'adagrad_workflow_optimize',
     'rmsprop_workflow_optimize',
     'adam_workflow_optimize'
 ]
 
 def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
+    """
+    Parameters
+    ----------
+    n_iters : number of iterations
+
+    learning_rate : starting learning rate
+
+    learning_rate_end : ending learning rate
+
+    Returns
+    -------
+    learning_rate : generator for learning rate
+    """
+
     if learning_rate < 0:
         raise ValueError('learning rate must be positive')
     if learning_rate_end is not None:
@@ -38,6 +53,53 @@ def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
             yield a / (b + i - start_decrease_at + 1)
         else:
             yield learning_rate_end
+
+def adagrad_optimize(n_iters, objective_and_grad, init_param,
+                     has_log_norm=False, window=10,learning_rate=.01,
+                     epsilon=.1, learning_rate_end=None):
+    local_grad_history = []
+    local_log_norm_history = []
+    value_history = []
+    log_norm_history = []
+    variational_param = init_param.copy()
+    variational_param_history = []
+    with tqdm.trange(n_iters) as progress:
+        try:
+            schedule = learning_rate_schedule(n_iters, learning_rate, learning_rate_end)
+            for i, curr_learning_rate in zip(progress, schedule):
+                prev_variational_param = variational_param
+                if has_log_norm:
+                    obj_val, obj_grad, log_norm = objective_and_grad(variational_param)
+                else:
+                    obj_val, obj_grad = objective_and_grad(variational_param)
+                    log_norm = 0
+                value_history.append(obj_val)
+                local_grad_history.append(obj_grad)
+                local_log_norm_history.append(log_norm)
+                log_norm_history.append(log_norm)
+                if len(local_grad_history) > window:
+                    local_grad_history.pop(0)
+                    local_log_norm_history.pop(0)
+                grad_scale = np.exp(np.min(local_log_norm_history) - np.array(local_log_norm_history))
+                scaled_grads = grad_scale[:,np.newaxis]*np.array(local_grad_history)
+                accum_sum = np.sum(scaled_grads**2, axis=0)
+                variational_param = variational_param - curr_learning_rate*obj_grad/np.sqrt(epsilon + accum_sum)
+                if i >= 3*n_iters // 4:
+                    variational_param_history.append(variational_param.copy())
+                if i % 10 == 0:
+                    avg_loss = np.mean(value_history[max(0, i - 1000):i + 1])
+                    progress.set_description(
+                        'Average Loss = {:,.5g}'.format(avg_loss))
+        except (KeyboardInterrupt, StopIteration) as e:  # pragma: no cover
+            # do not print log on the same line
+            progress.close()
+        finally:
+            progress.close()
+    variational_param_history = np.array(variational_param_history)
+    smoothed_opt_param = np.mean(variational_param_history, axis=0)
+    return (smoothed_opt_param, variational_param_history,
+            np.array(value_history), np.array(log_norm_history))
+
 
 def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                      has_log_norm=False, window=10,learning_rate=.01, learning_rate_end=None,
@@ -99,7 +161,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
             start_stats = 1500
             if stopping_rule == 2 and t > 1500 and t % eval_elbo == 0:
                 #print(np.nanmedian(mcse_all[:, -1]))
-                mcse_se_combined_list = montecarlo_se(np.array(variational_param_history)[None,:], 0)
+                mcse_se_combined_list = monte_carlo_se(np.array(variational_param_history)[None,:], 0)
                 mcse_all = np.hstack((mcse_all, mcse_se_combined_list[:,None]))
 
             value_history.append(obj_val)
@@ -141,7 +203,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                 variational_param_history_list.append(variational_param_history_array)
                 variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                 variational_param_history_list.pop(0)
-                rhats_halfway_last = compute_R_hat_halfway_light(variational_param_history_chains)
+                rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
                 rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                 if (rhat_mean_halfway < r_mean_threshold ).all() and sto_process_mean_conv == False:
@@ -356,7 +418,7 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                     start_stats= 500
                     mcse_se_combined_list = np.zeros((pmz_size, 1))
                     if stopping_rule == 2 and i > 1000 and i % eval_elbo == 0:
-                        mcse_se_combined_list = montecarlo_se(np.array(variational_param_history)[None, :], 0)
+                        mcse_se_combined_list = monte_carlo_se(np.array(variational_param_history)[None, :], 0)
                         mcse_all = np.hstack((mcse_all, mcse_se_combined_list[:, None]))
                     value_history.append(obj_val)
                     local_grad_history.append(obj_grad)
@@ -421,7 +483,7 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat_halfway_light(variational_param_history_chains)
+                        rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
@@ -623,7 +685,7 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                     start_stats= 1000
                     mcse_se_combined_list = np.zeros((pmz_size, 1))
                     if stopping_rule == 2 and i > 1000 and i % eval_elbo == 0:
-                        mcse_se_combined_list = montecarlo_se(np.array(variational_param_history)[None, :], 0)
+                        mcse_se_combined_list = monte_carlo_se(np.array(variational_param_history)[None, :], 0)
                         mcse_all = np.hstack((mcse_all, mcse_se_combined_list[:, None]))
 
                     value_history.append(obj_val)
@@ -688,7 +750,7 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat_halfway_light(variational_param_history_chains)
+                        rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
                             start_swa_m_iters = i

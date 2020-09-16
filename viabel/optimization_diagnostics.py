@@ -2,9 +2,23 @@
 import autograd.numpy as np
 from autograd.extend import primitive
 
-def compute_R_hat(chains, warmup=500):
-    #first axis is relaisations, second is iters
-    # N_realisations X N_iters X Ndims
+def compute_R_hat(chains, warmup=0):
+    """
+    Compute the split-R-hat for multiple chains,
+    all the chains are split into two and the R-hat is computed over them
+    before removing the 'warmup' iterates if desired.
+
+    Parameters
+    ----------
+    chains : multi-dimensional array, shape=(n_chains, n_iters, n_var_params)
+
+    Returns
+    -------
+    var_hat : var-hat computed in BDA
+
+    R_hat: the split R-hat for multiple chains
+    """
+
     jitter = 1e-8
     chains = chains[:, warmup:, :]
     n_iters = chains.shape[1]
@@ -27,7 +41,25 @@ def compute_R_hat(chains, warmup=500):
     R_hat = np.sqrt(var_hat)
     return var_hat, R_hat
 
-def compute_R_hat_halfway(chains, interval=100, start=1000):
+def compute_R_hat_window(chains, interval=100, start=1000):
+    """
+    Compute the split-R-hat for multiple chains over increasingly bigger
+    windows. Say you have 2000 iterates and the interval size is 100,
+    then this will compute the Rhat for first 1000, 1100, 1200, 1300
+    iterates and so on ...
+
+    Parameters
+    ----------
+    chains : multi-dimensional array, shape=(n_chains, n_iters, n_dimensions)
+
+    interval : size by which window size increases
+
+    start : iterate index at which the computation begins.
+
+    Returns
+    -------
+    R_hat_array : multi-dimensional of split R-hat statistics for increasingly bigger windows.
+    """
     n_chains, n_iters, K= chains.shape
     n_subchains = n_iters //interval
     r_hats_halfway = list()
@@ -40,45 +72,56 @@ def compute_R_hat_halfway(chains, interval=100, start=1000):
 
     return np.array(r_hats_halfway)
 
-def compute_R_hat_halfway_light(chains, warmup_fraction=0.5):
+def compute_R_hat_moving(chains, warmup_fraction=0.5):
+    """
+    Compute the split-R-hat for multiple chains over a moving window
+    - taking only the last warmup_fraction percentage of the iterates.
+
+    Parameters
+    ----------
+    chains : multi-dimensional array, shape=(n_chains, n_iters, n_dimensions)
+    warmup_fraction: percentage of the iterates: (1 -warmup_fraction)*n_iters
+    where n_iters is the current number of total iterates.
+
+    Returns
+    -------
+    r_hat_current : the r-hat value of the current window.
+    """
     n_chains, n_iters, K= chains.shape
     warmup = int(warmup_fraction*n_iters)
-    r_hat_current = compute_R_hat(chains, warmup=n_iters//2)[1]
+    r_hat_current = compute_R_hat(chains, warmup=warmup)[1]
     return r_hat_current
 
-def monte_carlo_se(iterate_chains, warmup=500):
-    chains = iterate_chains[:, warmup:, :]
-    n_chains, N_iters, K = chains.shape[0], chains.shape[1], chains.shape[2]
-    mcse_combined_list = np.zeros((N_iters,K))
-    print(chains.shape)
-    for i in range(1,N_iters):
-        chains_sub = chains[:, :i,:]
-        n_chains, n_iters, K = chains_sub.shape[0], chains_sub.shape[1], chains_sub.shape[2]
-        chains_flat = np.reshape(chains_sub, (n_chains*i, K))
-        variances = np.var(chains, ddof=1, axis=1)
-        variances_combined = np.var(chains_flat, ddof=1, axis=0)
-        mean_var_chains = np.mean(variances, axis=0)
-        mcse_per_chain = np.sqrt(variances / n_iters)
-        mcse_combined = np.sqrt(variances_combined/(i*n_chains))
-        mcse_combined_list[i] = mcse_combined
-
-    #print(mcse_per_chain.shape)
-    return mcse_per_chain, mcse_combined_list
 
 # compute mcmcse for a chain/array
-def monte_carlo_se2(iterate_chains, warmup=500, param_idx=0):
-    '''
-    compute monte carlo standard error for all chains and one parameter at a time.
-    :param iterate_chains:
-    :param warmup: warmup iterates
-    :return: array of mcse error for all chains for a particular variational parameter.
-    '''
+def monte_carlo_se_moving(iterate_chains, warmup=500, param_idx=0):
+    """
+    Compute the monte carlo standard error for a variational parameter
+    at each iterate using all iterates before that iterate.
+    The MCSE is computed using eq (5) of https://arxiv.org/pdf/1903.08008.pdf
+
+    Here, MCSE(\lambda_i):  sqrt(V(\lambda_i)/Seff)
+    where ESS is the effective sample size computed using eq(11).
+    MCSE is from 100th to the last iterate using all the chains.
+
+    Parameters
+    ----------
+    iterate_chains : multi-dimensional array, shape=(n_chains, n_iters, n_var_params)
+
+    warmup : warmup iterates
+
+    param_idx : index of the variational parameter
+
+    Returns
+    -------
+    mcse_combined_list : array of mcse values for variational parameter with param_idx
+    """
     chains = iterate_chains[:, warmup:, param_idx]
     n_chains, N_iters = chains.shape[0], chains.shape[1]
     mcse_combined_list = np.zeros(N_iters)
     Neff, _, _, _ = autocorrelation(iterate_chains, warmup=0, param_idx=param_idx)
 
-    for i in range(100, N_iters):
+    for i in range(101, N_iters):
         chains_sub = chains[:, :i]
         n_chains, n_iters = chains_sub.shape[0], chains_sub.shape[1]
         chains_flat = np.reshape(chains_sub, (n_chains*i, 1))
@@ -89,13 +132,18 @@ def monte_carlo_se2(iterate_chains, warmup=500, param_idx=0):
     return  np.array(mcse_combined_list)
 
 
-def montecarlo_se(iterate_chains, warmup=500):
-    '''
-    compute monte carlo standard error for all chains and all parameters at once.
-    :param iterate_chains:
-    :param warmup:
-    :return: array of mcse error for using all chains at once and for all parameters.
-    '''
+def monte_carlo_se(iterate_chains, warmup=500):
+    """
+    compute monte carlo standard error using all chains and all variational parameters at once.
+    Parameters
+    ----------
+    iterate_chains : multi-dimensional array, shape=(n_chains, n_iters, n_var_params)
+
+    Returns
+    -------
+    mcse_combined : Monte Carlo Standard Error
+
+    """
     n_chains, N_iters, K = iterate_chains.shape[0], iterate_chains.shape[1], iterate_chains.shape[2]
     chains_flat = np.reshape(iterate_chains, (n_chains * N_iters, K))
     variances_combined = np.var(chains_flat, ddof=1, axis=0)
@@ -104,7 +152,6 @@ def montecarlo_se(iterate_chains, warmup=500):
     Neff = np.zeros(K)
     for pmx in range(K):
         chains = iterate_chains[:, warmup:, pmx]
-        #print(chains_flat.shape)
         a, _, _, _ = autocorrelation(iterate_chains, warmup=0, param_idx=pmx)
         Neff[pmx] = a
 
@@ -112,15 +159,33 @@ def montecarlo_se(iterate_chains, warmup=500):
     return mcse_combined
 
 
-def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=80):
-    '''
-    computes autocorrelation using ALL chains for a particular variational parameter.
-    :param iterate_chains:
-    :param warmup:
-    :param param_idx:
-    :param lag_max:
-    :return:
-    '''
+def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=100):
+    """
+    Compute the autocorrelation and ESS for a variational parameter using FFT.
+    where ESS is the effective sample size computed using eq(10) and (11) of https://arxiv.org/pdf/1903.08008.pdf
+    MCSE is from 100th to the last iterate using all the chains.
+
+    Parameters
+    ----------
+    iterate_chains : multi-dimensional array, shape=(n_chains, n_iters, n_var_params)
+
+    warmup : warmup iterates
+
+    param_idx : index of the variational parameter
+
+    lag_max: lag value
+
+    Returns
+    -------
+    neff : Effective sample size
+
+    rho_t: autocorrelation at last lag
+
+    autocov: auto covariance using FFT
+
+    a: array of autocorrelation from lag t=0 to lag t=lag_max
+
+    """
     chains = iterate_chains[:, warmup:, param_idx]
     means = np.mean(chains, axis=1)
     variances = np.var(chains, ddof=1, axis=1)
@@ -142,7 +207,7 @@ def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=80):
     lag = 1
     a = []
     neff_array = []
-    while lag < 100:
+    while lag < lag_max:
         val =   1. - (var_chains - np.mean(autocov[:,lag])) / var_pooled
         a.append(val)
         if val >= 0:
@@ -156,16 +221,25 @@ def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=80):
     return neff, rho_t, autocov, np.asarray(a)
 
 
-def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing= True, fraction=0.15):
-    '''
-    function computes the khat for iterates of VI, preferable to run it after approximate convergence .
-    :param iterate_chains:
-    :param warmup:
-    :param param_idx:
-    :param increasing:
-    :param fraction:
-    :return:
-    '''
+def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing=True, fraction=0.15):
+    """
+    Compute the khat over iterates for a variational parameter after removing warmup.
+    Parameters
+    ----------
+    iterate_chains : multi-dimensional array, shape=(n_chains, n_iters, n_var_params)
+
+    warmup : warmup iterates
+
+    param_idx : index of the variational parameter
+
+    increasing : boolean sort array in increasing order: TRUE or decreasing order:FALSE
+
+    fraction: the fraction of iterates
+    Returns
+    -------
+    maximum of khat over all chains for the variational parameter param_idx
+
+    """
     chains = iterate_chains[:, warmup:, param_idx]
     n_iters = chains.shape[1]
     n_chains = chains.shape[0]
@@ -188,24 +262,6 @@ def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing= T
         k_hat_values[i] = k_post
 
     return np.nanmax(k_hat_values)
-
-def compute_posterior_moments(prior_mean, prior_covariance, noise_variance, x, y):
-    prior_L = np.linalg.cholesky(prior_covariance)
-    inv_L = np.linalg.inv(prior_L)
-    prior_precision = inv_L.T@inv_L
-    S_precision = prior_precision + x.T @ x *(1. / noise_variance)
-    a = np.linalg.cholesky(S_precision)
-    tmp1 = np.linalg.inv(a)
-    S = tmp1.T @ tmp1
-    post_S=S
-    post_mu = prior_precision@prior_mean + (1./noise_variance)* x.T@ y
-    post_mu = post_S@ post_mu
-    return post_mu, post_S
-
-def get_samples_and_log_weights(logdensity, var_family, var_param, n_samples):
-    samples = var_family.sample(var_param, n_samples)
-    log_weights = logdensity(samples) - var_family.logdensity(samples, var_param)
-    return samples, log_weights
 
 
 # taken from arviz ...
