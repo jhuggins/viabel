@@ -252,7 +252,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                 variational_param_history_list.append(variational_param_history_array)
                 variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                 variational_param_history_list.pop(0)
-                rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
+                rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)[1]
                 rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                 if (rhat_mean_halfway < r_mean_threshold ).all() and sto_process_mean_conv == False:
@@ -275,7 +275,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
             if sto_process_convergence:
                 variational_param_post_conv_history.append(variational_param)
 
-            if sto_process_convergence and j > 200 and t%(2*eval_elbo) ==0:
+            if sto_process_convergence and j > 100 and t%(eval_elbo) ==0:
                 variational_param_post_conv_history_array= np.array(variational_param_post_conv_history)
                 variational_param_post_conv_history_list.append(variational_param_post_conv_history_array)
                 variational_param_post_conv_history_chains = np.stack(variational_param_post_conv_history_list, axis=0)
@@ -535,7 +535,7 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
+                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)[1]
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
@@ -832,7 +832,7 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
+                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)[1]
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
                             start_swa_m_iters = i
