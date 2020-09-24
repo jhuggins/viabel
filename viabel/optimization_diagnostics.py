@@ -2,7 +2,7 @@
 import autograd.numpy as np
 from autograd.extend import primitive
 
-def compute_R_hat(chains, warmup=0):
+def compute_R_hat(chains, warmup=0.5):
     """
     Compute the split-R-hat for multiple chains,
     all the chains are split into two and the R-hat is computed over them
@@ -20,15 +20,22 @@ def compute_R_hat(chains, warmup=0):
     """
 
     jitter = 1e-8
-    chains = chains[:, warmup:, :]
     n_iters = chains.shape[1]
     n_chains = chains.shape[0]
-    K = chains.shape[2]
-    if n_iters%2 == 1:
-        n_iters = int(n_iters - 1)
-        chains = chains[:,:n_iters-1,:]
+    if warmup <1:
+        warmup = int(warmup*n_iters)
 
-    n_iters = n_iters // 2
+    if warmup > n_iters-2:
+        raise ValueError('Warmup should be less than number of iterates ..')
+
+    if (n_iters -warmup) %2 :
+        warmup = int(warmup +1)
+
+    chains = chains[:, warmup:, :]
+
+    K = chains.shape[2]
+    n_iters = chains.shape[1]
+    n_iters = int(n_iters//2)
     psi = np.reshape(chains, (n_chains * 2, n_iters, K))
     n_chains2 = n_chains*2
     psi_dot_j = np.mean(psi, axis=1)
@@ -41,7 +48,7 @@ def compute_R_hat(chains, warmup=0):
     R_hat = np.sqrt(var_hat)
     return var_hat, R_hat
 
-def compute_R_hat_window(chains, interval=100, start=1000):
+def compute_R_hat_window(chains, interval=100, warmup=0.5):
     """
     Compute the split-R-hat for multiple chains over increasingly bigger
     windows. Say you have 2000 iterates and the interval size is 100,
@@ -64,43 +71,32 @@ def compute_R_hat_window(chains, interval=100, start=1000):
     n_subchains = n_iters //interval
     r_hats_halfway = list()
 
+    if warmup <1:
+        warmup = int(warmup*n_iters)
+
+    if warmup > n_iters-1:
+        raise ValueError('Warmup should be less than number of iterates ..')
+
+    if (n_iters -warmup) %2 :
+        warmup = int(warmup +1)
+
     for i in range(n_subchains):
-        sub_chains = chains[:, :start+(i+1)*interval,:]
+        sub_chains = chains[:, :warmup+(i+1)*interval,:]
         n_sub_chains, n_sub_iters, K = sub_chains.shape
         r_hat_current = compute_R_hat(sub_chains, warmup=n_sub_iters//2)[1]
         r_hats_halfway.append(r_hat_current)
 
     return np.array(r_hats_halfway)
 
-def compute_R_hat_moving(chains, warmup_fraction=0.5):
-    """
-    Compute the split-R-hat for multiple chains over a moving window
-    - taking only the last warmup_fraction percentage of the iterates.
-
-    Parameters
-    ----------
-    chains : multi-dimensional array, shape=(n_chains, n_iters, n_dimensions)
-    warmup_fraction: percentage of the iterates: (1 -warmup_fraction)*n_iters
-    where n_iters is the current number of total iterates.
-
-    Returns
-    -------
-    r_hat_current : the r-hat value of the current window.
-    """
-    n_chains, n_iters, K= chains.shape
-    warmup = int(warmup_fraction*n_iters)
-    r_hat_current = compute_R_hat(chains, warmup=warmup)[1]
-    return r_hat_current
-
 
 # compute mcmcse for a chain/array
-def monte_carlo_se_moving(iterate_chains, warmup=500, param_idx=0):
+def monte_carlo_se_moving(chains, warmup=0.5, param_idx=0):
     """
     Compute the monte carlo standard error for a variational parameter
     at each iterate using all iterates before that iterate.
     The MCSE is computed using eq (5) of https://arxiv.org/pdf/1903.08008.pdf
 
-    Here, MCSE(\lambda_i):  sqrt(V(\lambda_i)/Seff)
+    Here, MCSE(\lambda_i)=  sqrt(V(\lambda_i)/Seff)
     where ESS is the effective sample size computed using eq(11).
     MCSE is from 100th to the last iterate using all the chains.
 
@@ -116,23 +112,34 @@ def monte_carlo_se_moving(iterate_chains, warmup=500, param_idx=0):
     -------
     mcse_combined_list : array of mcse values for variational parameter with param_idx
     """
-    chains = iterate_chains[:, warmup:, param_idx]
+
     n_chains, N_iters = chains.shape[0], chains.shape[1]
+
+    if warmup <1:
+        warmup = int(warmup*N_iters)
+
+    if warmup > N_iters-1:
+        raise ValueError('Warmup should be less than number of iterates ..')
+
+    if (N_iters -warmup) %2 :
+        warmup = int(warmup +1)
+
+    chains = chains[:, warmup:, param_idx]
     mcse_combined_list = np.zeros(N_iters)
-    Neff, _, _, _ = autocorrelation(iterate_chains, warmup=0, param_idx=param_idx)
+    Neff, _, _, _ = autocorrelation(chains, warmup=0, param_idx=param_idx)
 
     for i in range(101, N_iters):
         chains_sub = chains[:, :i]
         n_chains, n_iters = chains_sub.shape[0], chains_sub.shape[1]
         chains_flat = np.reshape(chains_sub, (n_chains*i, 1))
         variances_combined = np.var(chains_flat, ddof=1, axis=0)
-        Neff , _, _, _ = autocorrelation(iterate_chains[:,:i,:], warmup=0, param_idx=param_idx)
+        Neff , _, _, _ = autocorrelation(chains[:,:i,:], warmup=0, param_idx=param_idx)
         mcse_combined = np.sqrt(variances_combined/Neff)
         mcse_combined_list[i] = mcse_combined
     return  np.array(mcse_combined_list)
 
 
-def monte_carlo_se(iterate_chains, warmup=500):
+def monte_carlo_se(iterate_chains, warmup=0.5):
     """
     compute monte carlo standard error using all chains and all variational parameters at once.
     Parameters
@@ -144,8 +151,17 @@ def monte_carlo_se(iterate_chains, warmup=500):
     mcse_combined : Monte Carlo Standard Error
 
     """
-    n_chains, N_iters, K = iterate_chains.shape[0], iterate_chains.shape[1], iterate_chains.shape[2]
-    chains_flat = np.reshape(iterate_chains, (n_chains * N_iters, K))
+    n_chains, n_iters, K = iterate_chains.shape[0], iterate_chains.shape[1], iterate_chains.shape[2]
+
+    if warmup <1:
+        warmup = int(warmup*n_iters)
+
+    if warmup > n_iters-2:
+        raise ValueError('Warmup should be less than number of iterates ..')
+
+    if (n_iters -warmup) %2 :
+        warmup = int(warmup +1)
+    chains_flat = np.reshape(iterate_chains, (n_chains * n_iters, K))
     variances_combined = np.var(chains_flat, ddof=1, axis=0)
     #mcse_combined = np.sqrt(variances_combined / Neff)
 
@@ -159,7 +175,7 @@ def monte_carlo_se(iterate_chains, warmup=500):
     return mcse_combined
 
 
-def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=100):
+def autocorrelation(iterate_chains, warmup=0.5, param_idx=0, lag_max=100):
     """
     Compute the autocorrelation and ESS for a variational parameter using FFT.
     where ESS is the effective sample size computed using eq(10) and (11) of https://arxiv.org/pdf/1903.08008.pdf
@@ -184,13 +200,21 @@ def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=100):
     autocov: auto covariance using FFT
 
     a: array of autocorrelation from lag t=0 to lag t=lag_max
-
     """
+    n_iters = iterate_chains.shape[1]
+    n_chains = iterate_chains.shape[0]
+    if warmup <1:
+        warmup = int(warmup*n_iters)
+
+    if warmup > n_iters-2:
+        raise ValueError('Warmup should be less than number of iterates ..')
+
+    if (n_iters -warmup) %2 :
+        warmup = int(warmup +1)
+
     chains = iterate_chains[:, warmup:, param_idx]
     means = np.mean(chains, axis=1)
     variances = np.var(chains, ddof=1, axis=1)
-    n_iters = chains.shape[1]
-    n_chains = chains.shape[0]
     if n_chains == 1:
         var_between = 0
     else:
@@ -207,21 +231,20 @@ def autocorrelation(iterate_chains, warmup=500, param_idx=0, lag_max=100):
     lag = 1
     a = []
     neff_array = []
-    while lag < lag_max:
-        val =   1. - (var_chains - np.mean(autocov[:,lag])) / var_pooled
+    for lag in range(lag_max):
+        val =  1. - (var_chains - np.mean(autocov[:,lag])) / var_pooled
         a.append(val)
         if val >= 0:
             rho_t = rho_t + val
         else:
             #break
             rho_t =rho_t
-        lag = lag + 1
 
     neff = n_iters *n_chains /(1 + 2*rho_t)
     return neff, rho_t, autocov, np.asarray(a)
 
 
-def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing=True, fraction=0.15):
+def compute_khat_iterates(iterate_chains, warmup=0.85, param_idx=0, increasing=True):
     """
     Compute the khat over iterates for a variational parameter after removing warmup.
     Parameters
@@ -240,10 +263,9 @@ def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing=Tr
     maximum of khat over all chains for the variational parameter param_idx
 
     """
-    chains = iterate_chains[:, warmup:, param_idx]
+    chains = iterate_chains[:, :, param_idx]
     n_iters = chains.shape[1]
     n_chains = chains.shape[0]
-    #fraction = 0.05
 
     k_hat_values = np.zeros(n_chains)
     for i in range(n_chains):
@@ -252,8 +274,8 @@ def compute_khat_iterates(iterate_chains, warmup=500, param_idx=0, increasing=Tr
         else:
             sorted_chain = np.sort(-chains[i,:])
 
-        ind_last = int(n_iters * fraction)
-        filtered_chain = sorted_chain[n_iters-ind_last:]
+        ind_last = int(n_iters * warmup)
+        filtered_chain = sorted_chain[ind_last:]
         if increasing:
             filtered_chain = filtered_chain -np.min(filtered_chain)
         else:

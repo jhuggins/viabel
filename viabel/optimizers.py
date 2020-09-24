@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import tqdm
 import scipy.stats as stats
 from  .optimization_diagnostics import autocorrelation, monte_carlo_se_moving, compute_khat_iterates, \
-    gpdfit, monte_carlo_se, compute_R_hat, compute_R_hat_window, compute_R_hat_moving
+    gpdfit, monte_carlo_se, compute_R_hat, compute_R_hat_window
 
 
 __all__ = [
@@ -20,14 +20,18 @@ __all__ = [
     'adam_workflow_optimize'
 ]
 
+
 def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
     """
+    This function sets the schedule for the learning rate,
+    the learning rate is kept constant for first 25% and last 25 % iterations,
+    but it is linearly reduced from 25-75% iterations from learning_rate to learning_rate_end
+    such that the 25th and 75th quantile are given by learning_rate_end and learning_rate respectively.
+
     Parameters
     ----------
     n_iters : number of iterations
-
     learning_rate : starting learning rate
-
     learning_rate_end : ending learning rate
 
     Returns
@@ -57,6 +61,21 @@ def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
 def adagrad_optimize(n_iters, objective_and_grad, init_param,
                      has_log_norm=False, window=10,learning_rate=.01,
                      epsilon=.1, learning_rate_end=None):
+    """
+    This is adagrad optimizer without convergence diagnostics, we keep it as a baseline
+    , and for cases where the dimensionality is so high that
+    the optimizers may become too slow ....
+
+    :param n_iters:
+    :param objective_and_grad:
+    :param init_param:
+    :param has_log_norm:
+    :param window:
+    :param learning_rate:
+    :param epsilon:
+    :param learning_rate_end:
+    :return:
+    """
     local_grad_history = []
     local_log_norm_history = []
     value_history = []
@@ -106,6 +125,36 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                      epsilon=.1, tolerance=0.05, eval_elbo=100,  stopping_rule=1, n_optimizers=1,
                      r_mean_threshold=1.20, r_sigma_threshold=1.20,
                      tail_avg_iters=200, plotting= False, model_name=None):
+    """
+    stopping rule 1 means traditional ELBO stopping rule, while
+    stopping rule 2 means MCSE stopping rule.
+
+    The windowed Adagrad optimizer with convergence diagnostics and iterate averaging ...
+
+    :param n_iters:
+    :param objective_and_grad:
+    :param init_param: initial params
+    :param K:
+    :param has_log_norm:
+    :param window:
+    :param learning_rate:
+    :param epsilon:
+    :param rhat_window:
+    :param averaging:
+    :param n_optimisers:
+    :param r_mean_threshold:
+    :param r_sigma_threshold:
+    :param tail_avg_iters:
+    :param eval_elbo:
+    :param tolerance:
+    :param stopping_rule:
+    :param avg_grad_norm:
+    :param learning_rate_end:
+    :param plotting:
+    :param model_name:
+    :return:
+    """
+
     log_norm_history = []
     variational_param = init_param.copy()
     prev_elbo = 0.
@@ -203,7 +252,7 @@ def adagrad_workflow_optimize(n_iters, objective_and_grad, init_param,K,
                 variational_param_history_list.append(variational_param_history_array)
                 variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                 variational_param_history_list.pop(0)
-                rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
+                rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
                 rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                 if (rhat_mean_halfway < r_mean_threshold ).all() and sto_process_mean_conv == False:
@@ -486,7 +535,7 @@ def rmsprop_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
+                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
 
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
@@ -620,7 +669,7 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
     stopping rule 1 means traditional ELBO stopping rule, while
     stopping rule 2 means MCSE stopping rule.
 
-    The windowed RMSProp optimizer with the convergence diagnostics and iterate averaging ...
+    The windowed ADAM optimizer with the convergence diagnostics and iterate averaging ...
 
     :param n_iters:
     :param objective_and_grad:
@@ -783,7 +832,7 @@ def adam_workflow_optimize(n_iters, objective_and_grad, init_param, K,
                         variational_param_history_list.append(variational_param_history_array)
                         variational_param_history_chains = np.stack(variational_param_history_list, axis=0)
                         variational_param_history_list.pop(0)
-                        rhats_halfway_last = compute_R_hat_moving(variational_param_history_chains)
+                        rhats_halfway_last = compute_R_hat(variational_param_history_chains, warmup=0.5)
                         rhat_mean_halfway, rhat_sigma_halfway = rhats_halfway_last[:K], rhats_halfway_last[K:]
                         if (rhat_mean_halfway < r_mean_threshold).all() and sto_process_mean_conv == False:
                             start_swa_m_iters = i

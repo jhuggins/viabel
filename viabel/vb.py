@@ -25,8 +25,7 @@ __all__ = [
     't_variational_family',
     'black_box_klvi',
     'black_box_chivi',
-    'make_stan_log_density',
-    'adagrad_optimize',
+    'make_stan_log_density'
 ]
 
 VariationalFamily = namedtuple('VariationalFamily',
