@@ -1,0 +1,22 @@
+language: python
+python:
+  - 3.5
+  - 3.6
+
+notifications:
+  email:
+    recipients:
+      - huggins@bu.edu
+    on_success: never # default: change
+    on_failure: always # default: always
+
+install:
+  # Install this package and the packages listed in requirements.txt.
+  - pip install .
+  # Install extra requirements for running tests and building docs.
+  - pip install -r requirements-dev.txt
+
+script:
+  - coverage run --include='viabel/bounds.py' -m pytest
+  - coverage report -m  # Generate test coverage report.
+  - codecov  # Upload the report to codecov.

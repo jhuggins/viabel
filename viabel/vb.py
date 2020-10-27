@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 VariationalFamily = namedtuple('VariationalFamily',
-                               ['sample', 'entropy',
+                               ['sample', 'entropy', 'kl',
                                 'logdensity', 'mean_and_cov',
                                 'pth_moment', 'var_param_dim'])
 
@@ -49,6 +49,16 @@ def mean_field_gaussian_variational_family(dim):
         mean, log_std = unpack_params(var_param)
         return 0.5 * dim * (1.0 + np.log(2*np.pi)) + np.sum(log_std)
 
+    def kl(var_param0, var_param1):
+        mean0, log_std0 = unpack_params(var_param0)
+        mean1, log_std1 = unpack_params(var_param1)
+        mean_diff = mean0 - mean1
+        log_std_diff = log_std0 - log_std1
+        return .5 * np.sum(  np.exp(2*log_std_diff)
+                           + mean_diff**2 / np.exp(2*log_std1)
+                           - 2*log_std_diff
+                           - 1)
+
     def logdensity(x, var_param):
         mean, log_std = unpack_params(var_param)
         return mvn.logpdf(x, mean, np.diag(np.exp(2*log_std)))
@@ -67,7 +77,7 @@ def mean_field_gaussian_variational_family(dim):
         else:  # p == 4
             return 2*np.sum(vars**2) + np.sum(vars)**2
 
-    return VariationalFamily(sample, entropy, logdensity,
+    return VariationalFamily(sample, entropy, kl, logdensity,
                              mean_and_cov, pth_moment, 2*dim)
 
 
@@ -112,7 +122,7 @@ def mean_field_t_variational_family(dim, df):
         else:  # p == 4
             return c**2*(2*(df-1)/(df-4)*np.sum(scales**4) + np.sum(scales**2)**2)
 
-    return VariationalFamily(sample, entropy, logdensity,
+    return VariationalFamily(sample, entropy, None, logdensity,
                              mean_and_cov, pth_moment, 2*dim)
 
 
@@ -163,7 +173,7 @@ def t_variational_family(dim, df):
         else:  # p == 4
             return c**2*(2*(df-1)/(df-4)*np.sum(sq_scales**2) + np.sum(sq_scales)**2)
 
-    return VariationalFamily(sample, entropy, logdensity, mean_and_cov,
+    return VariationalFamily(sample, entropy, None, logdensity, mean_and_cov,
                              pth_moment, ms_pattern.flat_length(True))
 
 
@@ -221,5 +231,3 @@ def make_stan_log_density(fitobj):
         return lambda g: _ensure_2d(g) * _vectorize_if_needed(fitobj.grad_log_prob, x)
     defvjp(log_density, log_density_vjp)
     return log_density
-
-

@@ -1,5 +1,8 @@
 #  `viabel`: Variational Inference Approximation Bounds that are Efficient and Lightweight
 
+[![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel)
+[![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
+
 ## Description
 
 This package computes bounds errors of the mean, standard deviation, and variances

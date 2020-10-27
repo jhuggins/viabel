@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from viabel import (all_bounds, error_bounds,
                     wasserstein_bounds, divergence_bound)
 
