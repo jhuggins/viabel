@@ -2,10 +2,10 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-all
+
 from viabel import all_bounds
-from viabel.vb import black_box_klvi, black_box_chivi
-from viabel.optimizers import adagrad_optimize
+from viabel.objectives import black_box_klvi, black_box_chivi
+from viabel.optimization import adagrad_optimize
 from utils import Timer
 from psis import psislw
 
