@@ -98,7 +98,7 @@ Statistics* (AISTATS), Palermo, Italy. PMLR: Volume 108, 2020.
 The equivalent BibTeX entry is:
 ```
 @inproceedings{Huggins:2020:VI,
-  author = {Huggins, Jonathan H and Kasprzak, Miko&#0322;aj and Campbell, Trevor and Broderick, Tamara},
+  author = {Huggins, Jonathan H and Kasprzak, Miko{\l}aj and Campbell, Trevor and Broderick, Tamara},
   title = {{Validated Variational Inference via Practical Posterior Error Bounds}},
   booktitle = {Proc. of the 23rd International Conference on Artificial Intelligence and Statistics (AISTATS)},
   year = {2020}
