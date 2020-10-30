@@ -59,7 +59,7 @@ def _test_family(vf, var_param0, var_param1, entropy_offset=0,
     _test_mean_and_cov(vf, var_param0)
     _test_pth_moment(vf, var_param0, 2)
     _test_pth_moment(vf, var_param0, 4)
-
+    # TODO: check behavior for invalid choice of p
 
 
 def test_mf_gaussian_vf():
@@ -70,6 +70,7 @@ def test_mf_gaussian_vf():
             var_param0 = np.random.randn(vf.var_param_dim)
             var_param1 = np.random.randn(vf.var_param_dim)
             _test_family(vf, var_param0, var_param1)
+    # TODO: check behavior in corner cases
 
 
 def test_mf_t_vf():
@@ -83,6 +84,7 @@ def test_mf_t_vf():
             var_param0 = np.random.randn(vf.var_param_dim)
             var_param1 = np.random.randn(vf.var_param_dim)
             _test_family(vf, var_param0, var_param1, entropy_offset, True)
+    # TODO: check behavior in corner cases
 
 
 def test_t_vf():
@@ -96,3 +98,4 @@ def test_t_vf():
             var_param0 = np.random.randn(vf.var_param_dim)
             var_param1 = np.random.randn(vf.var_param_dim)
             _test_family(vf, var_param0, var_param1, entropy_offset, True)
+    # TODO: check behavior in corner cases

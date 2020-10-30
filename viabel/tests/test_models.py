@@ -34,7 +34,7 @@ def test_stan_model():
         with open(compiled_model_file, 'rb') as f:
             regression_model = pickle.load(f)
     except:
-        regression_model = pystan.StanModel(model_code=regression_model_code,
+        regression_model = pystan.StanModel(model_code=test_model,
                                             model_name='regression_model')
         with open('robust_reg_model.pkl', 'wb') as f:
             pickle.dump(sm, f)
