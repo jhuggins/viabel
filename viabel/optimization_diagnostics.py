@@ -1,6 +1,6 @@
-
 import autograd.numpy as np
 from autograd.extend import primitive
+
 
 def compute_R_hat(chains, warmup=0.5):
     """

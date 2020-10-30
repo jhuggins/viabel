@@ -17,6 +17,6 @@ install:
   - pip install -r requirements-dev.txt
 
 script:
-  - coverage run --include='viabel/bounds.py' -m pytest
+  - coverage run --include='viabel/[A-Za-z]*.py' -m pytest
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.

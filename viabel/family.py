@@ -1,8 +1,5 @@
 from collections import namedtuple
 
-from autograd import value_and_grad, vector_jacobian_product
-from autograd.extend import primitive, defvjp
-
 import autograd.numpy as np
 import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
@@ -15,7 +12,6 @@ from paragami import (PatternDict,
                       PSDSymmetricMatrixPattern,
                       FlattenFunctionInput)
 
-import tqdm
 
 from ._distributions import multivariate_t_logpdf
 
@@ -23,9 +19,6 @@ __all__ = [
     'mean_field_gaussian_variational_family',
     'mean_field_t_variational_family',
     't_variational_family',
-    'black_box_klvi',
-    'black_box_chivi',
-    'make_stan_log_density'
 ]
 
 VariationalFamily = namedtuple('VariationalFamily',
