@@ -1,4 +1,4 @@
-#  viabel: **V**ariational *I*nference and *A*pproximation *B*ounds that is *E*fficient and *L*ightweight [![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
+#  viabel: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight [![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
 
 [**Quickstart (variational inference)**](#quickstart-for-variational-inference)
 | [**Quickstart (error bounds)**](#quickstart-for-error-bounds)
