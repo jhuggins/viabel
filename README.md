@@ -61,7 +61,7 @@ var_param, _, _, _ = adagrad_optimize(n_iters, vi_objective_and_grad, init_var_p
 In this case, the resulting variational approximation (red) of the
 funnel distribution (black) is not particularly good.
 
-<img src="notebooks/funnel.png" width="600">
+<img src="notebooks/funnel.png" width="400">
 
 
 ## Quickstart for Error Bounds
