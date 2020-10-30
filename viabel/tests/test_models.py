@@ -25,7 +25,8 @@ parameters {
 
 model {
   beta ~ normal(0, 10);
-  y ~ student_t(df, x * beta, 1);  // likelihood"""
+  y ~ student_t(df, x * beta, 1);  // likelihood
+}"""
 
 
 def test_stan_model():
@@ -37,7 +38,7 @@ def test_stan_model():
         regression_model = pystan.StanModel(model_code=test_model,
                                             model_name='regression_model')
         with open('robust_reg_model.pkl', 'wb') as f:
-            pickle.dump(sm, f)
+            pickle.dump(regression_model, f)
     np.random.seed(5039)
     beta_gen = np.array([-2, 1])
     N = 25
