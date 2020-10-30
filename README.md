@@ -53,7 +53,7 @@ vi_objective_and_grad = black_box_klvi(var_family, log_density, num_mc_samples)
 The variational objective can be optimized using a windowed version of adagrad:
 ```python
 init_var_param = np.zeros(var_family.var_param_dim)
-n_iters = 10000
+n_iters = 2500
 # var_param is the estimated optimal variational parameter using iterate averaging
 var_param, _, _, _ = adagrad_optimize(n_iters, vi_objective_and_grad, init_var_param, learning_rate=.01)
 ```
