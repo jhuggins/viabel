@@ -1,10 +1,10 @@
-#  viabel: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight [![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
+#  VIABEL: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight [![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
 
 [**Quickstart (variational inference)**](#quickstart-for-variational-inference)
 | [**Quickstart (error bounds)**](#quickstart-for-error-bounds)
 | [**Install guide**](#installation)
 
-*viabel* provides two types of functionality:
+VIABEL provides two types of functionality:
 
 1. A lightweight, flexible set of methods for variational inference that is
 agnostic to how the model is constructed. All that is required is a log
@@ -17,10 +17,10 @@ distribution.
 
 ## Quickstart for Variational inference
 
-viabel currently supports both standard KL-based variational inference (KLVI)
+VIABEL currently supports both standard KL-based variational inference (KLVI)
 and chi-squared variational inference (CHIVI).
-Models are provided as `autograd`-compatible log densities or can be constructed
-from `pystan` fit objects.
+Models are provided as Autograd-compatible log densities or can be constructed
+from PyStan fit objects.
 As a simple example, we consider Neal's funnel distribution in 2 dimensions so
 that we can visualize the results.
 ```python
@@ -35,7 +35,7 @@ def log_density(x):
     mu_density = norm.logpdf(mu, 0, np.exp(log_sigma))
     return sigma_density + mu_density
 ```
-We will use mean-field t distributions as the variational family:
+We will use a product of *t*-distributions as the variational family:
 ```python
 from viabel.family import mean_field_t_variational_family
 var_family = mean_field_t_variational_family(D, 40)
@@ -98,11 +98,10 @@ Statistics* (AISTATS), Palermo, Italy. PMLR: Volume 108, 2020.
 The equivalent BibTeX entry is:
 ```
 @inproceedings{Huggins:2020:VI,
-author = {Huggins, Jonathan H and Kasprzak, Miko&#0322;aj and Campbell, Trevor and Broderick, Tamara},
-title = {{Validated Variational Inference via Practical Posterior Error Bounds}},
-booktitle = {Proc. of the 23rd International Conference on Artificial Intelligence and
-Statistics (AISTATS)},
-year = {2020}
+  author = {Huggins, Jonathan H and Kasprzak, Miko&#0322;aj and Campbell, Trevor and Broderick, Tamara},
+  title = {{Validated Variational Inference via Practical Posterior Error Bounds}},
+  booktitle = {Proc. of the 23rd International Conference on Artificial Intelligence and Statistics (AISTATS)},
+  year = {2020}
 }
 ```
 
