@@ -1,8 +1,9 @@
-#  VIABEL: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight [![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
+#  VIABEL: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight
+[![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
 
-[**Quickstart (variational inference)**](#quickstart-for-variational-inference)
-| [**Quickstart (error bounds)**](#quickstart-for-error-bounds)
-| [**Install guide**](#installation)
+[**Quickstart**](#quickstart)
+| [**Install Guide**](#installation)
+| [**Usage Examples**](#usage-examples)
 
 VIABEL provides two types of functionality:
 
@@ -15,7 +16,9 @@ and variance estimates produced by a continuous approximation to an
 A canonical application is a variational approximation to a Bayesian posterior
 distribution.
 
-## Quickstart for Variational inference
+## Quickstart
+
+### Variational inference
 
 VIABEL currently supports both standard KL-based variational inference (KLVI)
 and chi-squared variational inference (CHIVI).
@@ -64,7 +67,7 @@ funnel distribution (black) is not particularly good.
 <img src="notebooks/funnel.png" width="400">
 
 
-## Quickstart for Error Bounds
+### Error Bounds
 
 The error bounds are based on samples from the approximation *Q* and evaluations
 of the (maybe unnormalized) log densities of *Q* and the target distribution *P*.
