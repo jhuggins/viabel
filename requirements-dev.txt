@@ -1,6 +1,11 @@
 # These are required for developing the package (running the tests, building
 # the documentation) but not necessarily required for _using_ it.
+
+# code coverage and testing
 codecov
 coverage
 pytest
 pystan
+
+# documentation
+sphinx
