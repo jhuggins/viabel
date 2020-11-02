@@ -18,6 +18,7 @@ development) that provides two types of functionality:
 
    installation
    quickstart
+   api/api
 
 .. Indices and tables
    ==================
