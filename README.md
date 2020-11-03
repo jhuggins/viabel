@@ -19,7 +19,7 @@ distribution.
 ## Documentation
 
 For examples and API documentation (which are works-in-progress), see
-[readthedocs](viabel.readthedocs.io).
+[readthedocs](https://viabel.readthedocs.io).
 
 ## Quickstart
 
