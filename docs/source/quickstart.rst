@@ -55,6 +55,6 @@ The error bounds are based on samples from the approximation *Q* and evaluations
 of the (maybe unnormalized) log densities of *Q* and the target distribution *P*.
 In particular, you can compute bounds on:
 
-* the α-divergence between *P* and *Q*
+* the :math:`\alpha`-divergence between *P* and *Q*
 * the *p*\ -Wasserstein distance between *P* and *Q*
 * the differences between the means, standard deviations, and variances of *P* and *Q*
