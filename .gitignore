@@ -1,5 +1,19 @@
-*.pyc
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
 *.so
+
+# Distribution / packaging
 *.egg-info
+build/
+
+# ipython junk
 .ipynb_checkpoints
+
+# Mac OS junk
 .DS_Store
+
+# python virtual environments
+*-env/

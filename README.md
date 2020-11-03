@@ -1,5 +1,5 @@
 #  VIABEL: *V*ariational *I*nference and *A*pproximation *B*ounds that are *E*fficient and *L*ightweight
-[![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![image](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel)
+[![Build Status](https://travis-ci.org/jhuggins/viabel.svg?branch=master)](https://travis-ci.org/jhuggins/viabel) [![Code Coverage](https://codecov.io/gh/jhuggins/viabel/branch/master/graph/badge.svg)](https://codecov.io/gh/jhuggins/viabel) [![Documentation Status](https://readthedocs.org/projects/viabel/badge/?version=latest)](https://viabel.readthedocs.io/en/latest/?badge=latest)
 
 [**Quickstart**](#quickstart)
 | [**Install Guide**](#installation)
@@ -15,6 +15,11 @@ and variance estimates produced by a continuous approximation to an
 (unnormalized) distribution.
 A canonical application is a variational approximation to a Bayesian posterior
 distribution.
+
+## Documentation
+
+For examples and API documentation (which are works-in-progress), see
+[readthedocs](viabel.readthedocs.io).
 
 ## Quickstart
 
