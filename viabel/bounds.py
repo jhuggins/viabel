@@ -27,7 +27,8 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
         samples `x_i` associated with log weights
 
     moment_bound_fn : function
-        `moment_bound_fn(p)` should return a bound on `min_y E[(x_i - y)^p]`.
+        `moment_bound_fn(p)` should return a bound on
+        :math:`\\min_y \\mathbb E[(x_i - y)^p]`.
         It must be provided if `samples` is `None` and it must support `p = 2`
         and `p = 4`.
 
@@ -115,7 +116,8 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
         samples from `q`.
 
     moment_bound_fn : array-like matrix, shape=(n_variant_types, n_signatures)
-        `moment_bound_fn(a)` should return a bound on `min_y E[(x_i - y)^a]`.
+        `moment_bound_fn(a)` should return a bound on
+        :math:`\\min_y \\mathbb E[(x_i - y)^p]`.
         It must be provided if `samples` is `None`. Must support `a = 2`
         and `a = 4`.
 
