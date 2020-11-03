@@ -13,8 +13,7 @@ def black_box_klvi(var_family, logdensity, n_samples):
     def variational_objective(var_param):
         """Provides a stochastic estimate of the variational lower bound."""
         samples = var_family.sample(var_param, n_samples)
-        #lower_bound = var_family.entropy(var_param) + np.mean(logdensity(samples))
-        lower_bound = np.mean(logdensity(samples) - var_family.logdensity(samples, var_param))
+        lower_bound = var_family.entropy(var_param) + np.mean(logdensity(samples))
         return -lower_bound
 
     objective_and_grad = value_and_grad(variational_objective)
