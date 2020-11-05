@@ -6,4 +6,5 @@ API
 
    vi
    approximations
+   models
    bounds

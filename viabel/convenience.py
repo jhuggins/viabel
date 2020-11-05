@@ -21,15 +21,17 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
         Number of Monte Carlo samples to use for estimating the gradient of
         the objective.
     log_density : `function`
-        Log density of the model. It must be provided unless ``fit`` is specified.
+        (Unnormalized) log density of the model. Must support automatic
+        differentiation with ``autograd``. Either ``log_density`` or ``fit``
+        must be provided.
     approx : `ApproximationFamily` object
         The approximation family. The default is to use ``viabel.approximations.MFGaussian``.
     objective : `function`
         Function for constructing the objective and gradient function. The default is
         to use ``viabel.objectives.black_box_klvi``.
     fit : `StanFit4model` object
-        If provided, ``log_density`` will be constructed using ``viabel.models.make_stan_log_density``.
-        Both ``fit`` and ``log_density`` cannot be given.
+        If provided, a ``StanModel`` will be used. Both ``fit`` and
+        ``log_density`` cannot be given.
     **kwargs
         Keyword arguments to pass to ``adagrad_optimize``.
 

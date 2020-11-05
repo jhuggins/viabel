@@ -14,9 +14,6 @@ from autograd import elementwise_grad
 
 
 def _test_model(m, x, supports_tempering, supports_constrain):
-    # print(x)
-    # print(m(x))
-    # print(jacobian(m)(x))
     check_vjp(m, x)
     check_vjp(m, x[0])
     assert supports_tempering == m.supports_tempering
