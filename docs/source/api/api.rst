@@ -5,4 +5,5 @@ API
    :maxdepth: 4
 
    vi
+   approximations
    bounds

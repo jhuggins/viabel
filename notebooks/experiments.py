@@ -58,22 +58,22 @@ def check_approx_accuracy(var_family, var_param, true_mean, true_cov,
 
 ## Convenience functions and PSIS ##
 
-def get_samples_and_log_weights(logdensity, var_family, var_param, n_samples):
+def get_samples_and_log_weights(log_density, var_family, var_param, n_samples):
     samples = var_family.sample(var_param, n_samples)
-    log_weights = logdensity(samples) - var_family.logdensity(samples, var_param)
+    log_weights = log_density(samples) - var_family.log_density(samples, var_param)
     return samples, log_weights
 
 
-def psis_correction(logdensity, var_family, var_param, n_samples):
-    samples, log_weights = get_samples_and_log_weights(logdensity, var_family,
+def psis_correction(log_density, var_family, var_param, n_samples):
+    samples, log_weights = get_samples_and_log_weights(log_density, var_family,
                                                        var_param, n_samples)
     smoothed_log_weights, khat = psislw(log_weights)
     return samples.T, smoothed_log_weights, khat
 
 
-def improve_with_psis(logdensity, var_family, var_param, n_samples,
+def improve_with_psis(log_density, var_family, var_param, n_samples,
                       true_mean, true_cov, transform=None, verbose=False):
-    samples, slw, khat = psis_correction(logdensity, var_family,
+    samples, slw, khat = psis_correction(log_density, var_family,
                                          var_param, n_samples)
     if verbose:
         print('khat = {:.3g}'.format(khat))
@@ -92,16 +92,16 @@ def improve_with_psis(logdensity, var_family, var_param, n_samples,
 
 ## Plotting ##
 
-def plot_approx_and_exact_contours(logdensity, var_family, var_param,
+def plot_approx_and_exact_contours(log_density, var_family, var_param,
                                    xlim=[-10,10], ylim=[-3, 3],
                                    cmap2='Reds', savepath=None):
     xlist = np.linspace(*xlim, 100)
     ylist = np.linspace(*ylim, 100)
     X, Y = np.meshgrid(xlist, ylist)
     XY = np.concatenate([np.atleast_2d(X.ravel()), np.atleast_2d(Y.ravel())]).T
-    zs = np.exp(logdensity(XY))
+    zs = np.exp(log_density(XY))
     Z = zs.reshape(X.shape)
-    zsapprox = np.exp(var_family.logdensity(XY, var_param))
+    zsapprox = np.exp(var_family.log_density(XY, var_param))
     Zapprox = zsapprox.reshape(X.shape)
     plt.contour(X, Y, Z, cmap='Greys', linestyles='solid')
     plt.contour(X, Y, Zapprox, cmap=cmap2, linestyles='solid')
@@ -135,7 +135,7 @@ def plot_dist_to_opt_param(var_param_history, opt_param):
 
 ## Run experiment with both KLVI and CHIVI ##
 
-def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
+def _optimize_and_check_results(log_density, var_family, objective_and_grad,
                                 init_var_param, true_mean, true_cov,
                                 plot_contours, ylabel, contour_kws=dict(),
                                 elbo=None, n_iters=5000,
@@ -157,9 +157,9 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
         print()
         with Timer('Computing CUBO and ELBO with {} samples'.format(n_samples)):
             _, log_weights = get_samples_and_log_weights(
-                logdensity, var_family, opt_param, n_samples)
+                log_density, var_family, opt_param, n_samples)
             var_dist_cov = var_family.mean_and_cov(opt_param)[1]
-            moment_bound_fn = lambda p: var_family.pth_moment(p, opt_param)
+            moment_bound_fn = lambda p: var_family.pth_moment(opt_param, p)
             other_results.update(all_bounds(log_weights,
                                             q_var=var_dist_cov,
                                             moment_bound_fn=moment_bound_fn,
@@ -168,34 +168,34 @@ def _optimize_and_check_results(logdensity, var_family, objective_and_grad,
             print()
             print_bounds(other_results)
     if plot_contours:
-        plot_approx_and_exact_contours(logdensity, var_family, opt_param,
+        plot_approx_and_exact_contours(log_density, var_family, opt_param,
                                        **contour_kws)
     if use_psis:
         print()
         print('Results with PSIS correction')
         print('----------------------------')
         other_results['psis_results'], _, _ = \
-            improve_with_psis(logdensity, var_family, opt_param, n_psis_samples,
+            improve_with_psis(log_density, var_family, opt_param, n_psis_samples,
                               true_mean, true_cov, verbose=verbose)
     return accuracy_results, other_results
 
 
-def run_experiment(logdensity, var_family, init_param, true_mean, true_cov,
+def run_experiment(log_density, var_family, init_param, true_mean, true_cov,
                    kl_n_samples=100, chivi_n_samples=500,
                    alpha=2, **kwargs):
-    klvi = black_box_klvi(var_family, logdensity, kl_n_samples)
-    chivi = black_box_chivi(alpha, var_family, logdensity, chivi_n_samples)
+    klvi = black_box_klvi(var_family, log_density, kl_n_samples)
+    chivi = black_box_chivi(alpha, var_family, log_density, chivi_n_samples)
     dim = true_mean.size
     plot_contours = dim == 2
     if plot_contours:
-        plot_approx_and_exact_contours(logdensity, var_family, init_param,
+        plot_approx_and_exact_contours(log_density, var_family, init_param,
                                        **kwargs.get('contour_kws', dict()))
 
     print('|--------------|')
     print('|     KLVI     |')
     print('|--------------|', flush=True)
     kl_results, other_kl_results = _optimize_and_check_results(
-        logdensity, var_family, klvi, init_param,
+        log_density, var_family, klvi, init_param,
         true_mean, true_cov, plot_contours, '-ELBO', **kwargs)
     kl_results['method'] = 'KLVI'
     print()
@@ -204,7 +204,7 @@ def run_experiment(logdensity, var_family, init_param, true_mean, true_cov,
     print('|---------------|', flush=True)
     elbo = other_kl_results['log_norm_bound']
     chivi_results, other_chivi_results = _optimize_and_check_results(
-        logdensity, var_family, chivi, init_param, true_mean, true_cov,
+        log_density, var_family, chivi, init_param, true_mean, true_cov,
         plot_contours, 'CUBO', elbo=elbo, **kwargs)
     chivi_results['method'] = 'CHIVI'
     return klvi, chivi, kl_results, chivi_results, other_kl_results, other_chivi_results

@@ -19,23 +19,23 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
 
     Parameters
     ----------
-    log_weights : array-like of integers, shape=(n_samples,)
+    log_weights : `array-like` of `int`, shape (n_samples,)
         log weights `log p(x_i) - log q(x_i)`, where `x_i` is sampled from `q`
         and `p` may be an unnormalized distribution
 
-    samples : array-like matrix, shape=(n_samples, n_dimensions)
+    samples : array-like matrix, shape (n_samples, n_dimensions)
         samples `x_i` associated with log weights
 
-    moment_bound_fn : function
+    moment_bound_fn : `function`
         `moment_bound_fn(p)` should return a bound on
         :math:`\\min_y \\mathbb E[(x_i - y)^p]`.
         It must be provided if `samples` is `None` and it must support `p = 2`
         and `p = 4`.
 
-    q_var : float or array-like matrix
+    q_var : `float` or `array-like matrix`
         (Bound on) the (co)variance of `q`.
 
-    p_var : float or array-like matrix
+    p_var : `float` or `array-like matrix`
         (Bound on) the (co)variance of `p`.
 
     log_norm_bound : float
@@ -45,7 +45,7 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
 
     Returns
     -------
-    results : dict
+    results : `dict`
         contains the following bounds: `mean_error`, `var_error`, `std_error`,
         `d2`, `W1`, `W2`."""
     d2, log_norm_bound = divergence_bound(log_weights,
@@ -77,21 +77,21 @@ def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
 
     Parameters
     ----------
-    W1 : float
+    W1 : `float`
         (Bound on) the 1-Wasserstein distance between `p` and `q`.
 
-    W2 : float
+    W2 : `float`
         (Bound on) the 2-Wasserstein distance between `p` and `q`.
 
-    q_var : float or array-like matrix
+    q_var : `float` or `array-like matrix`
         (Bound on) the (co)variance of `q`.
 
-    p_var : float or array-like matrix
+    p_var : `float` or `array-like matrix`
         (Bound on) the (co)variance of `p`.
 
     Returns
     -------
-    results : dict
+    results : `dict`
         contains the following bounds: `mean_error`, `var_error`, `std_error`."""
     results = dict()
     results['mean_error'] = mean_bound(min(W1, W2))
@@ -109,13 +109,13 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
 
     Parameters
     ----------
-    d2 : float
+    d2 : `float`
         (Bound on) the 2-divergence between `p` and `q`.
 
-    samples : array-like matrix, shape=(n_samples, n_dimensions)
+    samples : `array-like matrix`, shape (n_samples, n_dimensions)
         samples from `q`.
 
-    moment_bound_fn : array-like matrix, shape=(n_variant_types, n_signatures)
+    moment_bound_fn : `array-like matrix`, shape (n_variant_types, n_signatures)
         `moment_bound_fn(a)` should return a bound on
         :math:`\\min_y \\mathbb E[(x_i - y)^p]`.
         It must be provided if `samples` is `None`. Must support `a = 2`
@@ -123,7 +123,7 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
 
     Returns
     -------
-    results : dict
+    results : `dict`
         contains the following bounds: `W1`, `W2`."""
     results = dict()
     if moment_bound_fn is None:
@@ -150,20 +150,20 @@ def divergence_bound(log_weights, alpha=2., log_norm_bound=None,
 
     Parameters
     ----------
-    log_weights : array-like of integers, shape=(n_samples,)
+    log_weights : `array-like` of `int`, shape (n_samples,)
         log weights `log p(x_i) - log q(x_i)`, where `x_i` is sampled from `q`
         and `p` may be an unnormalized distribution.
 
-    alpha : float
+    alpha : `float`
         order of the Renyi divergence. Must be greater than 1
 
-    log_norm_bound : float
+    log_norm_bound : `float`
         Bound on the log normalization constant for `p` (the log marginal
         likelihood when `p` is the unnormalized log posterior).
 
     Returns
     -------
-    dalpha : float
+    dalpha : `float`
         Bound on the alpha-divergence."""
     if alpha <= 1:
         raise ValueError('alpha must be greater than 1')
