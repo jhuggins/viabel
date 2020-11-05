@@ -1,7 +1,7 @@
 import numpy as np
 
 from viabel.approximations import MFGaussian
-from viabel.models import make_stan_log_density
+from viabel.models import Model, StanModel
 from viabel.objectives import black_box_klvi
 from viabel.optimization import adagrad_optimize
 
@@ -43,9 +43,12 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
             raise ValueError('either log_density or fit must be specified')
         if objective_and_grad is not None:
             raise ValueError('objective_and_grad can only be specified if log_density is too')
-        log_density = make_stan_log_density(fit)
-    elif fit is not None:
+        model = StanModel(fit)
+    elif fit is None:
+        model = Model(log_density)
+    else:
         raise ValueError('log_density and fit cannot both be specified')
+
     if approx is None:
         if objective_and_grad is not None:
             raise ValueError('objective_and_grad can only be specified if approx is too')
@@ -56,7 +59,7 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
     var_param, var_param_history, _, _ = adagrad_optimize(n_iters, objective_and_grad, init_param, **kwargs)
     results = dict(var_param=var_param,
                    var_param_history=var_param_history,
-                   log_density=log_density,
+                   model=model,
                    approx=approx,
                    objective_and_grad=objective_and_grad)
     return results

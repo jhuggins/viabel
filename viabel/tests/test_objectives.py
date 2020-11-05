@@ -31,7 +31,3 @@ def test_klvi():
 
 def test_chivi():
     _test_vi(black_box_chivi, 100, alpha=2)
-
-
-if __name__ == '__main__':
-    test_klvi()
