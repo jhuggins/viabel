@@ -14,7 +14,7 @@ def test_bbvi():
     results = convenience.bbvi(2, log_density=log_p, n_samples=100,
                                epsilon=1e-8, learning_rate_end=.0001)
     # iterate averaging introduces some bias, so use last iterate
-    est_mean, est_cov = results['family'].mean_and_cov(results['var_param_history'][-1])
+    est_mean, est_cov = results['approx'].mean_and_cov(results['var_param_history'][-1])
     est_stdev = np.sqrt(np.diag(est_cov))
     np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
     np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)

@@ -26,15 +26,13 @@ For examples and API documentation (which are works-in-progress), see
 ### Variational inference
 
 VIABEL currently supports both standard KL-based variational inference (KLVI)
-and chi-squared variational inference (CHIVI).
-Models are provided as Autograd-compatible log densities or can be constructed
-from PyStan fit objects.
-As a simple example, we consider Neal's funnel distribution in 2 dimensions so
-that we can visualize the results.
+and chi-squared variational inference (CHIVI). Models are provided as
+Autograd-compatible log densities or can be constructed from PyStan fit objects.
+
+As a simple example, we consider Neal's funnel distribution in 2 dimensions so that we can visualize the results.
 ```python
 import autograd.numpy as np
 import autograd.scipy.stats.norm as norm
-
 D = 2  # number of dimensions
 log_sigma_stdev = 1.35
 def log_density(x):
@@ -43,27 +41,14 @@ def log_density(x):
     mu_density = norm.logpdf(mu, 0, np.exp(log_sigma))
     return sigma_density + mu_density
 ```
-We will use a product of *t*-distributions as the variational family:
-```python
-from viabel.family import mean_field_t_variational_family
-var_family = mean_field_t_variational_family(D, 40)
-```
-The variational objective is (standard) exclusive KL-divergence (i.e., the ELBO)
-with unbiased reparameterization gradients:
-```python
-from viabel.objectives import black_box_klvi
-# number of Monte Carlo samples for estimating gradients
-num_mc_samples = 100   
-# function that returns an unbiased estimate of the objective and its gradient
-vi_objective_and_grad = black_box_klvi(var_family, log_density, num_mc_samples)
-```
 
-The variational objective can be optimized using a windowed version of adagrad:
+VIABEL's `bbvi` function provides reasonable defaults: the objective is the ELBO
+(i.e., the including Kullback-Leibler divergence), a mean-field Gaussian
+approximation family, and windowed version of adagrad for stochastic optimization:
+
 ```python
-init_var_param = np.zeros(var_family.var_param_dim)
-n_iters = 2500
-# var_param is the estimated optimal variational parameter using iterate averaging
-var_param, _, _, _ = adagrad_optimize(n_iters, vi_objective_and_grad, init_var_param, learning_rate=.01)
+from viabel import bbvi
+results = bbvi(D, n_iters=5000, log_density=log_density)
 ```
 
 In this case, the resulting variational approximation (red) of the

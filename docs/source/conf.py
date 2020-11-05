@@ -42,6 +42,11 @@ extensions = [
     'sphinx_copybutton',
 ]
 
+# Configuration options for plot_directive. See:
+# https://github.com/matplotlib/matplotlib/blob/f3ed922d935751e08494e5fb5311d3050a3b637b/lib/matplotlib/sphinxext/plot_directive.py#L81
+plot_html_show_source_link = False
+plot_html_show_formats = False
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -50,6 +55,21 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+# Generate the API documentation when building
+autosummary_generate = True
+numpydoc_show_class_members = True
+
+# autoclass_content = 'both'
+
+def skip(app, what, name, obj, would_skip, options):
+    if name == "__init__" :
+        return False
+    if isinstance(obj, property):
+        return True
+    return would_skip
+
+def setup(app):
+    app.connect("autodoc-skip-member", skip)
 
 # -- Options for HTML output -------------------------------------------------
 

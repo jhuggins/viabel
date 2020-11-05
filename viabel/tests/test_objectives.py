@@ -1,4 +1,4 @@
-from viabel import black_box_klvi, black_box_chivi, mean_field_t_variational_family, adagrad_optimize
+from viabel import black_box_klvi, black_box_chivi, MFStudentT, adagrad_optimize
 
 import autograd.numpy as anp
 import numpy as np
@@ -12,14 +12,14 @@ def _test_vi(objective, n_samples, **kwargs):
     mean = np.array([1.,-1.])[np.newaxis,:]
     stdev = np.array([2.,5.])[np.newaxis,:]
     log_p = lambda x: anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
-    family = mean_field_t_variational_family(2, 100)
-    objective_and_grad = objective(var_family=family, logdensity=log_p,
+    approx = MFStudentT(2, 100)
+    objective_and_grad = objective(var_family=approx, log_density=log_p,
                                    n_samples=n_samples, **kwargs)
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
     init_param = np.array([0., 0., 1., 1.])
     var_param, var_param_history, _, _ = adagrad_optimize(5000, objective_and_grad, init_param, epsilon=1e-8, learning_rate_end=.0001)
     # iterate averaging introduces some bias, so use last iterate
-    est_mean, est_cov = family.mean_and_cov(var_param_history[-1])
+    est_mean, est_cov = approx.mean_and_cov(var_param_history[-1])
     est_stdev = np.sqrt(np.diag(est_cov))
     np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
     np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)

@@ -2,12 +2,16 @@
 __pycache__/
 *.py[cod]
 
+# pickles
+*.pkl
+
 # C extensions
 *.so
 
 # Distribution / packaging
 *.egg-info
 build/
+.coverage
 
 # ipython junk
 .ipynb_checkpoints
