@@ -4,6 +4,8 @@ import autograd.numpy as anp
 import numpy as np
 from autograd.scipy.stats import norm
 
+import pytest
+
 
 def test_bbvi():
     np.random.seed(851)
@@ -18,3 +20,12 @@ def test_bbvi():
     est_stdev = np.sqrt(np.diag(est_cov))
     np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
     np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+
+    with pytest.raises(ValueError):
+        convenience.bbvi(2)
+    with pytest.raises(ValueError):
+        convenience.bbvi(2, objective_and_grad=True, fit=True)
+    with pytest.raises(ValueError):
+        convenience.bbvi(2, log_density=True, fit=True)
+    with pytest.raises(ValueError):
+        convenience.bbvi(2, log_density=True, objective_and_grad=True)

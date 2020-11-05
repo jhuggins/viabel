@@ -56,7 +56,7 @@ class ApproximationFamily(ABC):
 
     @abstractmethod
     def sample(self, var_param, n_samples, seed=None):
-        """Return n_samples from variational distribution
+        """Generate samples from the variational distribution
 
         Parameters
         ----------
@@ -67,12 +67,22 @@ class ApproximationFamily(ABC):
 
         Returns
         -------
-        samples : `numpy.ndarray` of shape (n_samples, var_param_dim)
+        samples : `numpy.ndarray`, shape (n_samples, var_param_dim)
         """
         pass
 
     def entropy(self, var_param):
-        """Compute entropy of variational distribution."""
+        """Compute entropy of variational distribution.
+
+        Parameters
+        ----------
+        var_param : `numpy.ndarray`, shape (var_param_dim,)
+            The variational parameter.
+
+        Raises
+        ------
+        NotImplementedError
+            If entropy computation is not supported."""
         if self.supports_entropy:
             return self._entropy(var_param)
         raise NotImplementedError()
@@ -86,7 +96,18 @@ class ApproximationFamily(ABC):
         return self._supports_entropy
 
     def kl(self, var_param0, var_param1):
-        """Compute the Kullback-Leibler divergence KL(var_param0 | var_param1)"""
+        """Compute the Kullback-Leibler (KL) divergence.
+
+        Parameters
+        ----------
+        var_param0, var_param1 : `numpy.ndarray`, shape (var_param_dim,)
+            The variational parameters.
+
+        Raises
+        ------
+        NotImplementedError
+            If KL divergence computation is not supported.
+        """
         if self.supports_kl:
             return self._kl(var_param0, var_param1)
         raise NotImplementedError()
@@ -101,18 +122,42 @@ class ApproximationFamily(ABC):
 
     @abstractmethod
     def log_density(self, var_param, x):
-        """Compute the log density of the variational distribution at `x`"""
+        """The log density of the variational distribution.
+
+        Parameters
+        ----------
+        var_param : `numpy.ndarray`, shape (var_param_dim,)
+            The variational parameter.
+        x : `numpy.ndarray`, shape (dim,)
+            Value at which to evaluate the density."""
         pass
 
     @abstractmethod
     def mean_and_cov(self, var_param):
-        """Compute mean and covariance of the variational distribution"""
+        """The mean and covariance of the variational distribution.
+
+        Parameters
+        ----------
+        var_param : `numpy.ndarray`, shape (var_param_dim,)
+            The variational parameter.
+        """
         pass
 
     def pth_moment(self, var_param, p):
-        """Compute the absolute pth moment :math:`\\mathbb{E}[|X|^p]` of the variational distribution
+        """The absolute pth moment of the variational distribution.
 
-        Raises ``ValueError`` if `p` value not supported"""
+        The absolute pth moment is given by :math:`\\mathbb{E}[|X|^p]`.
+
+        Parameters
+        ----------
+        var_param : `numpy.ndarray`, shape (var_param_dim,)
+            The variational parameter.
+        p : `int`
+
+        Raises
+        ------
+        ValueError
+            If `p` value not supported"""
         if self.supports_pth_moment(p):
             return self._pth_moment(var_param, p)
         raise ValueError('p = {} is not a supported moment'.format(p))

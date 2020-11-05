@@ -14,7 +14,7 @@ development) that provides two types of functionality:
 #. Methods for computing bounds on the errors of the mean, standard deviation, and variance estimates produced by a continuous approximation to an (unnormalized) distribution. A canonical application is a variational approximation to a Bayesian posterior distribution.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    installation
    quickstart

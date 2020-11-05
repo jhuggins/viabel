@@ -56,16 +56,16 @@ def _test_family(vf, var_param0, var_param1, should_support=[], entropy_offset=0
     # These tests check that the variational family is defined self-consistently
     if vf.supports_entropy:
         _test_entropy(vf, var_param0, entropy_offset)
-    else:
+    else: # pragma: no cover
         with pytest.raises(NotImplementedError):
             vf.entropy(var_param0)
     if vf.supports_kl:
         _test_kl(vf, var_param0, var_param1)
-    else:
+    else: # pragma: no cover
         with pytest.raises(NotImplementedError):
             vf.kl(var_param0, var_param1)
     _test_mean_and_cov(vf, var_param0)
-    for p in set([2,4]) | set(should_support):
+    for p in set([1, 2,4]) | set(should_support):
         if p in should_support:
             assert vf.supports_pth_moment(p)
         if vf.supports_pth_moment(p):

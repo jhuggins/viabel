@@ -11,7 +11,7 @@ def _gaussian_alpha_divergence(alpha, var1, var2):
     """Compute D_alpha(N(0, var1) | N(0, var2))"""
     tmp = alpha*var2 - (alpha - 1)*var1
     print('tmp =', tmp)
-    if tmp < 0:
+    if tmp < 0: # pragma: no cover
         return np.inf
     return -0.5 / (alpha - 1) * np.log(tmp) + .5*alpha/(alpha - 1)*np.log(var2)  - .5*np.log(var1)
 
