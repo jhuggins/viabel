@@ -62,7 +62,7 @@ numpydoc_show_class_members = True
 # autoclass_content = 'both'
 
 def skip(app, what, name, obj, would_skip, options):
-    if name == "__init__" :
+    if name in ["__init__", "__call__"]:
         return False
     if isinstance(obj, property):
         return True

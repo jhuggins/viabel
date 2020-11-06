@@ -6,5 +6,6 @@ API
 
    vi
    approximations
+   objectives
    models
    bounds

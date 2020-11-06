@@ -2,11 +2,11 @@ import numpy as np
 
 from viabel.approximations import MFGaussian
 from viabel.models import Model, StanModel
-from viabel.objectives import black_box_klvi
+from viabel.objectives import ExclusiveKL
 from viabel.optimization import adagrad_optimize
 
 
-def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, objective_and_grad=None, fit=None,  **kwargs):
+def bbvi(dimension, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None,  **kwargs):
     """Fit a model using black-box variational inference.
 
     Currently the objective is optimized using ``viabel.optimization.adagrad_optimize``.
@@ -17,7 +17,7 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
         Dimension of the model parameter.
     n_iters : `int`
         Number of iterations of the optimization.
-    n_samples : `int`
+    num_mc_samples : `int`
         Number of Monte Carlo samples to use for estimating the gradient of
         the objective.
     log_density : `function`
@@ -28,7 +28,7 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
         The approximation family. The default is to use ``viabel.approximations.MFGaussian``.
     objective : `function`
         Function for constructing the objective and gradient function. The default is
-        to use ``viabel.objectives.black_box_klvi``.
+        to use ``viabel.objectives.ExclusiveKL``.
     fit : `StanFit4model` object
         If provided, a ``StanModel`` will be used. Both ``fit`` and
         ``log_density`` cannot be given.
@@ -43,8 +43,8 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
     if log_density is None:
         if fit is None:
             raise ValueError('either log_density or fit must be specified')
-        if objective_and_grad is not None:
-            raise ValueError('objective_and_grad can only be specified if log_density is too')
+        if objective is not None:
+            raise ValueError('objective can only be specified if log_density is too')
         model = StanModel(fit)
     elif fit is None:
         model = Model(log_density)
@@ -52,16 +52,14 @@ def bbvi(dimension, n_iters=10000, n_samples=10, log_density=None, approx=None, 
         raise ValueError('log_density and fit cannot both be specified')
 
     if approx is None:
-        if objective_and_grad is not None:
-            raise ValueError('objective_and_grad can only be specified if approx is too')
+        if objective is not None:
+            raise ValueError('objective can only be specified if approx is too')
         approx = MFGaussian(dimension)
-    if objective_and_grad is None:
-        objective_and_grad = black_box_klvi(approx, log_density, n_samples)
+    if objective is None:
+        objective = ExclusiveKL(approx, log_density, num_mc_samples)
     init_param = np.zeros(approx.var_param_dim)
-    var_param, var_param_history, _, _ = adagrad_optimize(n_iters, objective_and_grad, init_param, **kwargs)
+    var_param, var_param_history, _, _ = adagrad_optimize(n_iters, objective, init_param, **kwargs)
     results = dict(var_param=var_param,
                    var_param_history=var_param_history,
-                   model=model,
-                   approx=approx,
-                   objective_and_grad=objective_and_grad)
+                   objective=objective)
     return results
