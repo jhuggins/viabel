@@ -45,8 +45,8 @@ def learning_rate_schedule(n_iters, learning_rate, learning_rate_end):
             yield learning_rate_end
 
 
-def adagrad_optimize(n_iters, objective_and_grad, init_param,
-                     has_log_norm=False, window=10,learning_rate=.01,
+def adagrad_optimize(n_iters, objective, init_param,
+                     has_log_norm=False, window=10, learning_rate=.01,
                      epsilon=.1, learning_rate_end=None):
     """
     This is adagrad optimizer without convergence diagnostics, we keep it as a baseline
@@ -54,7 +54,7 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
     the optimizers may become too slow ....
 
     :param n_iters:
-    :param objective_and_grad:
+    :param objective:
     :param init_param:
     :param has_log_norm:
     :param window:
@@ -75,9 +75,9 @@ def adagrad_optimize(n_iters, objective_and_grad, init_param,
             for i, curr_learning_rate in zip(progress, schedule):
                 prev_variational_param = variational_param
                 if has_log_norm:
-                    obj_val, obj_grad, log_norm = objective_and_grad(variational_param)
+                    obj_val, obj_grad, log_norm = objective(variational_param)
                 else:
-                    obj_val, obj_grad = objective_and_grad(variational_param)
+                    obj_val, obj_grad = objective(variational_param)
                     log_norm = 0
                 value_history.append(obj_val)
                 local_grad_history.append(obj_grad)
