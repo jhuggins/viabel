@@ -191,6 +191,7 @@ def _get_mu_log_sigma_pattern(dim):
 
 
 class MFGaussian(ApproximationFamily):
+    """A mean-field Gaussian approximation family"""
     def __init__(self, dim, seed=1):
         """Create mean field Gaussian approximation family.
 
@@ -222,7 +223,7 @@ class MFGaussian(ApproximationFamily):
                            - 2*log_stdev_diff
                            - 1)
 
-    def log_density(self, x, var_param):
+    def log_density(self, var_param, x):
         param_dict = self._pattern.fold(var_param)
         return mvn.logpdf(x, param_dict['mu'], np.diag(np.exp(2*param_dict['log_sigma'])))
 
@@ -243,6 +244,7 @@ class MFGaussian(ApproximationFamily):
 
 
 class MFStudentT(ApproximationFamily):
+    """A mean-field Student's t approximation family"""
     def __init__(self, dim, df, seed=1):
         if df <= 2:
             raise ValueError('df must be greater than 2')
@@ -261,7 +263,7 @@ class MFStudentT(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         return np.sum(param_dict['log_sigma'])
 
-    def log_density(self, x, var_param):
+    def log_density(self, var_param, x):
         if x.ndim == 1:
             x = x[np.newaxis,:]
         param_dict = self._pattern.fold(var_param)
@@ -301,6 +303,7 @@ def _get_mu_sigma_pattern(dim):
 
 
 class MultivariateT(ApproximationFamily):
+    """A full-rank multivariate t approximation family"""
     def __init__(self, dim, df, seed=1):
         if df <= 2:
             raise ValueError('df must be greater than 2')
@@ -326,7 +329,7 @@ class MultivariateT(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         return .5*np.log(np.linalg.det(param_dict['Sigma']))
 
-    def log_density(self, x, var_param):
+    def log_density(self, var_param, x):
         return self._log_density(var_param, x)
 
     def mean_and_cov(self, var_param):
