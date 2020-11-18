@@ -17,7 +17,7 @@ development) that provides two types of functionality:
    :maxdepth: 2
 
    installation
-   quickstart
+   quickstart.ipynb
    api/api
 
 .. Indices and tables

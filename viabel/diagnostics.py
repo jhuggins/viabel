@@ -3,19 +3,20 @@ from warnings import warn
 import numpy as np
 
 __all__ = [
-    'all_bounds',
+    'all_diagnostics',
     'error_bounds',
     'wasserstein_bounds',
     'divergence_bound'
 ]
 
 
-def all_bounds(log_weights, samples=None, moment_bound_fn=None,
-               q_var=None, p_var=None, log_norm_bound=None):
-    """Compute all error and distance bounds.
+def all_diagnostics(log_weights, *, samples=None, moment_bound_fn=None,
+                    q_var=None, p_var=None, log_norm_bound=None):
+    """Compute all VI diagnostics.
 
     Compute error and distance bounds between distribution `p` and `q` using
     samples from `q`. The distributions need not be normalized.
+    Also compute the Pareto k-hat diagnostic.
 
     Parameters
     ----------
@@ -38,7 +39,7 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
     p_var : `float` or `array-like matrix`
         (Bound on) the (co)variance of `p`.
 
-    log_norm_bound : float
+    log_norm_bound : `float`
         Bound on the overall log normalization constant (the log marginal
         likelihood when `p` is the unnormalized log posterior)
 
@@ -46,12 +47,13 @@ def all_bounds(log_weights, samples=None, moment_bound_fn=None,
     Returns
     -------
     results : `dict`
-        contains the following bounds: `mean_error`, `var_error`, `std_error`,
+        contains the following entries: `mean_error`, `var_error`, `std_error`,
         `d2`, `W1`, `W2`."""
     d2, log_norm_bound = divergence_bound(log_weights,
                                           log_norm_bound=log_norm_bound,
                                           return_log_norm_bound=True)
-    results = wasserstein_bounds(d2, samples, moment_bound_fn)
+    results = wasserstein_bounds(d2, samples=samples,
+                                 moment_bound_fn=moment_bound_fn)
 
     if q_var is None and samples is not None:
         q_var = np.cov(samples.T)
@@ -68,7 +70,7 @@ def _compute_norm_if_needed(var):
     return var
 
 
-def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
+def error_bounds(*, W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
     """Compute error bounds.
 
     Compute bounds on differences in the means, standard deviations, and
@@ -101,7 +103,7 @@ def error_bounds(W1=np.inf, W2=np.inf, q_var=np.inf, p_var=np.inf):
     return results
 
 
-def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
+def wasserstein_bounds(d2, *, samples=None, moment_bound_fn=None):
     """Compute all bounds.
 
     Compute 1- and 2-Wasserstein distance bounds between distribution `p` and
@@ -141,7 +143,7 @@ def wasserstein_bounds(d2, samples=None, moment_bound_fn=None):
     return results
 
 
-def divergence_bound(log_weights, alpha=2., log_norm_bound=None,
+def divergence_bound(log_weights, *, alpha=2., log_norm_bound=None,
                      return_log_norm_bound=False):
     """Compute a bound on the alpha-divergence.
 

@@ -8,4 +8,4 @@ API
    approximations
    objectives
    models
-   bounds
+   diagnostics

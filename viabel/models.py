@@ -1,6 +1,9 @@
 from autograd.extend import primitive, defvjp
 import autograd.numpy as np
 
+from ._utils import ensure_2d, vectorize_if_needed
+
+
 __all__ = [
     'Model',
     'StanModel'
@@ -75,27 +78,12 @@ class Model(object):
         raise NotImplementedError()
 
 
-def _vectorize_if_needed(f, a, axis=-1):
-    if a.ndim > 1:
-        return np.apply_along_axis(f, axis, a)
-    else:
-        return f(a)
-
-
-def _ensure_2d(a):
-    if a.ndim == 0:
-        return a
-    while a.ndim < 2:
-        a = a[:,np.newaxis]
-    return a
-
-
 def _make_stan_log_density(fitobj):
     @primitive
     def log_density(x):
-        return _vectorize_if_needed(fitobj.log_prob, x)
+        return vectorize_if_needed(fitobj.log_prob, x)
     def log_density_vjp(ans, x):
-        return lambda g: _ensure_2d(g) * _vectorize_if_needed(fitobj.grad_log_prob, x)
+        return lambda g: ensure_2d(g) * vectorize_if_needed(fitobj.grad_log_prob, x)
     defvjp(log_density, log_density_vjp)
     return log_density
 

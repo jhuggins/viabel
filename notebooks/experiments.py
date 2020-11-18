@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from viabel import all_bounds
-from viabel.objectives import black_box_klvi, black_box_chivi
+from viabel import all_diagnostics
+from viabel.objectives import ExclusiveKL, AlphaDivergence
 from viabel.optimization import adagrad_optimize
 from utils import Timer
 from psis import psislw
@@ -60,7 +60,7 @@ def check_approx_accuracy(var_family, var_param, true_mean, true_cov,
 
 def get_samples_and_log_weights(log_density, var_family, var_param, n_samples):
     samples = var_family.sample(var_param, n_samples)
-    log_weights = log_density(samples) - var_family.log_density(samples, var_param)
+    log_weights = log_density(samples) - var_family.log_density(var_param, samples)
     return samples, log_weights
 
 
@@ -101,7 +101,7 @@ def plot_approx_and_exact_contours(log_density, var_family, var_param,
     XY = np.concatenate([np.atleast_2d(X.ravel()), np.atleast_2d(Y.ravel())]).T
     zs = np.exp(log_density(XY))
     Z = zs.reshape(X.shape)
-    zsapprox = np.exp(var_family.log_density(XY, var_param))
+    zsapprox = np.exp(var_family.log_density(var_param, XY))
     Zapprox = zsapprox.reshape(X.shape)
     plt.contour(X, Y, Z, cmap='Greys', linestyles='solid')
     plt.contour(X, Y, Zapprox, cmap=cmap2, linestyles='solid')
@@ -160,7 +160,7 @@ def _optimize_and_check_results(log_density, var_family, objective_and_grad,
                 log_density, var_family, opt_param, n_samples)
             var_dist_cov = var_family.mean_and_cov(opt_param)[1]
             moment_bound_fn = lambda p: var_family.pth_moment(opt_param, p)
-            other_results.update(all_bounds(log_weights,
+            other_results.update(all_diagnostics(log_weights,
                                             q_var=var_dist_cov,
                                             moment_bound_fn=moment_bound_fn,
                                             log_norm_bound=elbo))
