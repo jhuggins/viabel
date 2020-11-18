@@ -187,7 +187,7 @@ def divergence_bound(log_weights, *, alpha=2., log_norm_bound=None,
 def mean_and_check_mc_error(a, atol=0.01, rtol=0.0, quantity_name=None):
     m = np.mean(a)
     s = np.std(a)/np.sqrt(a.size)
-    if s > rtol*np.abs(m) + atol:
+    if s > rtol*np.abs(m) + atol: # pragma: no cover
         msg = 'significant Monte Carlo error'
         if quantity_name is not None:
             msg += ' when computing ' + quantity_name
