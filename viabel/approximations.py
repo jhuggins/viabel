@@ -292,7 +292,7 @@ class MFStudentT(ApproximationFamily):
 
     @property
     def df(self):
-        """Degrees of freedom.""""
+        """Degrees of freedom."""
         return self._df
 
 
