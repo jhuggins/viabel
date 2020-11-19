@@ -191,7 +191,7 @@ def _get_mu_log_sigma_pattern(dim):
 
 
 class MFGaussian(ApproximationFamily):
-    """A mean-field Gaussian approximation family"""
+    """A mean-field Gaussian approximation family."""
     def __init__(self, dim, seed=1):
         """Create mean field Gaussian approximation family.
 
@@ -244,7 +244,7 @@ class MFGaussian(ApproximationFamily):
 
 
 class MFStudentT(ApproximationFamily):
-    """A mean-field Student's t approximation family"""
+    """A mean-field Student's t approximation family."""
     def __init__(self, dim, df, seed=1):
         if df <= 2:
             raise ValueError('df must be greater than 2')
@@ -292,6 +292,7 @@ class MFStudentT(ApproximationFamily):
 
     @property
     def df(self):
+        """Degrees of freedom."""
         return self._df
 
 
@@ -303,7 +304,7 @@ def _get_mu_sigma_pattern(dim):
 
 
 class MultivariateT(ApproximationFamily):
-    """A full-rank multivariate t approximation family"""
+    """A full-rank multivariate t approximation family."""
     def __init__(self, dim, df, seed=1):
         if df <= 2:
             raise ValueError('df must be greater than 2')
@@ -354,4 +355,5 @@ class MultivariateT(ApproximationFamily):
 
     @property
     def df(self):
+        """Degrees of freedom."""
         return self._df
