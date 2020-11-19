@@ -24,9 +24,8 @@ For examples and API documentation (which are works-in-progress), see
 ## Installation
 
 You can install the latest stable version using `pip install viabel`.
-If you want to run all of the [example notebooks](notebooks),
-use the command `pip install viabel[examples]`, which will install additional
-dependencies.
+Alternatively, you can clone the repository and use the master branch to
+get the most up-to-date version. 
 
 ## Citing viabel
 

@@ -137,7 +137,7 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
     if results['d2'] > 4.6: # pragma: no cover
         print('WARNING: d2 > 4.6 means the approximation is very inaccurate')
     elif results['d2'] > 0.1:
-        print('WARNING: 4.6 > d2 > 0.1 means the approximate is somewhat '
+        print('WARNING: 0.1 > d2 < 4.6 means the approximation is somewhat '
               'inaccurate. Use importance sampling to decrease error.')
     else:
         print('\nAll diagnostics pass.')
