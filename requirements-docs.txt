@@ -1,9 +1,10 @@
 sphinx>=1.4
-#ipython
+ipython
 matplotlib
+seaborn
 numpydoc
 sphinx-copybutton
 sphinx_rtd_theme
-#ipykernel
+ipykernel
 nbsphinx
-#nbstripout
+nbstripout
