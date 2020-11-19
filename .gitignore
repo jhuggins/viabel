@@ -10,8 +10,12 @@ __pycache__/
 
 # Distribution / packaging
 *.egg-info
-build/
 .coverage
+htmlcov/
+
+# generated docs
+build/
+viabel.*.rst
 
 # ipython junk
 .ipynb_checkpoints
@@ -21,3 +25,4 @@ build/
 
 # python virtual environments
 *-env/
+venv/
