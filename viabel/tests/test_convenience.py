@@ -33,9 +33,11 @@ def test_bbvi():
 
 
 def test_vi_diagnostics():
+    np.random.seed(153)
     log_p = lambda x: anp.sum(norm.logpdf(x), axis=1)
     results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100,
-                               n_iters=15000, epsilon=1e-8, learning_rate_end=.0001)
+                               epsilon=1e-8, learning_rate_end=.0001,
+                               init_var_param=np.zeros(4))
     diagnostics = convenience.vi_diagnostics(results['var_param'],
                                              objective=results['objective'])
     assert diagnostics['khat'] < 0
