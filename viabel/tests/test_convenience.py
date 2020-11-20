@@ -29,12 +29,13 @@ def test_bbvi():
     with pytest.raises(ValueError):
         convenience.bbvi(2, log_density=True, fit=True)
     with pytest.raises(ValueError):
-        convenience.bbvi(2, log_density=True, objective=True)
+        convenience.bbvi(2, objective=True, log_density=True)
+
 
 def test_vi_diagnostics():
     log_p = lambda x: anp.sum(norm.logpdf(x), axis=1)
     results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100,
-                               epsilon=1e-8, learning_rate_end=.0001)
+                               n_iters=15000, epsilon=1e-8, learning_rate_end=.0001)
     diagnostics = convenience.vi_diagnostics(results['var_param'],
                                              objective=results['objective'])
     assert diagnostics['khat'] < 0
