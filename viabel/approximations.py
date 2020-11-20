@@ -202,7 +202,12 @@ class MFGaussian(ApproximationFamily):
         """
         self._rs = npr.RandomState(seed)
         self._pattern = _get_mu_log_sigma_pattern(dim)
-        super().__init__(dim, 2*dim, True, True)
+        super().__init__(dim, self._pattern.flat_length(True), True, True)
+
+    def init_param(self):
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=2*np.ones(self.dim))
+        return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
         my_rs = self._rs if seed is None else npr.RandomState(seed)
@@ -251,7 +256,12 @@ class MFStudentT(ApproximationFamily):
         self._df = df
         self._rs = npr.RandomState(seed)
         self._pattern = _get_mu_log_sigma_pattern(dim)
-        super().__init__(dim, 2*dim, True, False)
+        super().__init__(dim, self._pattern.flat_length(True), True, False)
+
+    def init_param(self):
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=2*np.ones(self.dim))
+        return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
         my_rs = self._rs if seed is None else npr.RandomState(seed)
@@ -315,6 +325,11 @@ class MultivariateT(ApproximationFamily):
             lambda param_dict, x: multivariate_t_logpdf(x, param_dict['mu'], param_dict['Sigma'], df),
             patterns=self._pattern, free=True, argnums=0)
         super().__init__(dim, self._pattern.flat_length(True), True, False)
+
+    def init_param(self):
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               Sigma=10*np.eye(self.dim))
+        return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
         my_rs = self._rs if seed is None else npr.RandomState(seed)

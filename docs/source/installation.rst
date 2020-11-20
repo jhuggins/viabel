@@ -13,11 +13,13 @@ the latest version from github::
 
 To run the tests, install the development requirements either during installation::
 
-$ pip install viabel[dev]
+    $ pip install viabel[dev]
 
 or, in root of the repository, run::
 
-$ pip install -r requirements-dev.txt. Then, in the root of the repository, run::
+    $ pip install -r requirements-dev.txt.
+
+Then, in the root of the repository, run::
 
     $ python3 -m pytest
 

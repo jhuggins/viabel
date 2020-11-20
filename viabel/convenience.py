@@ -13,7 +13,7 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None,  **kwargs):
+def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, **kwargs):
     """Fit a model using black-box variational inference.
 
     Currently the objective is optimized using ``viabel.optimization.adagrad_optimize``.
@@ -38,6 +38,8 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
     fit : `StanFit4model` object
         If provided, a ``StanModel`` will be used. Both ``fit`` and
         ``log_density`` cannot be given.
+    init_var_param
+        Initial variational parameter.
     **kwargs
         Keyword arguments to pass to ``adagrad_optimize``.
 
@@ -47,25 +49,29 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         Contains the following entries: `var_param`, `var_param_history`,
         `objective`
     """
-    if log_density is None:
-        if fit is None:
-            raise ValueError('either log_density or fit must be specified')
-        if objective is not None:
-            raise ValueError('objective can only be specified if log_density is too')
-        model = StanModel(fit)
-    elif fit is None:
-        model = Model(log_density)
+    if objective is not None:
+        if fit is not None or log_density is not None or approx is not None:
+            raise ValueError('if objective is specified, cannot specify fit, log_density, or approx')
+        approx = objective.approx
+        model = objective.model
     else:
-        raise ValueError('log_density and fit cannot both be specified')
-
-    if approx is None:
-        if objective is not None:
-            raise ValueError('objective can only be specified if approx is too')
-        approx = MFGaussian(dimension)
-    if objective is None:
-        objective = ExclusiveKL(approx, log_density, num_mc_samples)
-    init_param = np.zeros(approx.var_param_dim)
-    var_param, var_param_history, _, _ = adagrad_optimize(n_iters, objective, init_param, **kwargs)
+        if log_density is None:
+            if fit is None:
+                raise ValueError('either log_density or fit must be specified if objective not given')
+            model = StanModel(fit)
+        elif fit is None:
+            model = Model(log_density)
+        else:
+            raise ValueError('log_density and fit cannot both be specified')
+        if approx is None:
+            approx = MFGaussian(dimension)
+        objective = ExclusiveKL(approx, model, num_mc_samples)
+    if init_var_param is None:
+        init_var_param = approx.init_param()
+    var_param, var_param_history, _, _ = adagrad_optimize(n_iters,
+                                                          objective,
+                                                          init_var_param,
+                                                          **kwargs)
     results = dict(var_param=var_param,
                    var_param_history=var_param_history,
                    objective=objective)

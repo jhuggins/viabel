@@ -18,6 +18,7 @@ development) that provides two types of functionality:
 
    installation
    quickstart.ipynb
+   robust-regression.ipynb
    api/api
 
 .. Indices and tables
