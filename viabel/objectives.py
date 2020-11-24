@@ -137,7 +137,7 @@ class AlphaDivergence(StochasticVariationalObjective):
         """Provides a stochastic estimate of the variational lower bound."""
         def compute_log_weights(var_param, seed):
             samples = self.approx.sample(var_param, self.num_mc_samples, seed)
-            log_weights = self.model(samples) - self.approx.log_density(samples, var_param)
+            log_weights = self.model(samples) - self.approx.log_density(var_param, samples)
             return log_weights
 
         log_weights_vjp = vector_jacobian_product(compute_log_weights)

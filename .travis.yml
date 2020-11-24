@@ -11,10 +11,7 @@ notifications:
     on_failure: always # default: always
 
 install:
-  # Install this package and the packages listed in requirements.txt.
-  - pip install .
-  # Install extra requirements for running tests and building docs.
-  - pip install -r requirements-dev.txt
+  - pip install .[dev]
 
 script:
   - coverage run --include='viabel/[A-Za-z]*.py' -m pytest
