@@ -36,19 +36,18 @@ def test_vi_diagnostics():
     np.random.seed(153)
     log_p = lambda x: anp.sum(norm.logpdf(x), axis=1)
     results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100,
-                               epsilon=1e-8, learning_rate_end=.0001,
-                               init_var_param=np.zeros(4))
+                               epsilon=1e-8, learning_rate_end=.0001)
     diagnostics = convenience.vi_diagnostics(results['var_param'],
                                              objective=results['objective'])
     assert diagnostics['khat'] < 0
-    assert diagnostics['d2'] < 1e-3
+    assert diagnostics['d2'] < 0.1
 
     log_p2 = lambda x: anp.sum(norm.logpdf(x, scale=3), axis=1)
     model2 = Model(log_p2)
     diagnostics2 = convenience.vi_diagnostics(results['var_param'],
                                               approx=results['objective'].approx,
                                               model=model2)
-    assert diagnostics2['khat'] > .7
+    assert diagnostics2['khat'] > 0.7
     assert 'd2' not in diagnostics2
 
     log_p3 = lambda x: anp.sum(norm.logpdf(x, scale=.5), axis=1)
