@@ -1,5 +1,5 @@
 from viabel.approximations import MFStudentT
-from viabel.optimization import adagrad_optimize
+from viabel.optimization import SASA, RMSProp
 from viabel.objectives import ExclusiveKL, AlphaDivergence
 
 import autograd.numpy as anp
@@ -18,13 +18,14 @@ def _test_vi(objective_cls, num_mc_samples, **kwargs):
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
     init_param = np.array([0, 0, 1, 1], dtype=np.float32)
-    var_param, var_param_history, _, _ = adagrad_optimize(5000, objective, init_param, epsilon=1e-8, learning_rate_end=.0001)
+    sasa = SASA(RMSProp(0.01),2)
+    sasa_results = sasa.optimize(50000, objective, init_param)
     # iterate averaging introduces some bias, so use last iterate
-    est_mean, est_cov = approx.mean_and_cov(var_param_history[-1])
+    est_mean, est_cov = approx.mean_and_cov(sasa_results['variational_param_history'][-1])
     est_stdev = np.sqrt(np.diag(est_cov))
     print(est_stdev, stdev)
-    np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
-    np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+    np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=1)
+    np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=1)
 
 
 def test_objective():

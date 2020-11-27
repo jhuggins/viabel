@@ -54,3 +54,16 @@ Diagnostics
    divergence_bound
    error_bounds
    wasserstein_bounds
+
+Optimization
+------------
+
+.. autosummary::
+   :template: myclass.rst
+   :toctree:
+
+   Optimizer
+   StochasticGradientOptimizer
+   RMSProp
+   AdaGrad
+   SASA
