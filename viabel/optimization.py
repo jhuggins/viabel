@@ -117,7 +117,7 @@ class AdaGrad(StochasticGradientOptimizer):
         
     def descent_direction(self, grad, history):
         if history is None:
-            history = grad**2
+            history = 0
         history = history + grad**2   
         descent_dir = grad / np.sqrt(self._jitter+history)
         return (descent_dir, history)

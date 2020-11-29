@@ -1,4 +1,4 @@
-from viabel.optimization import SASA, RMSProp
+from viabel.optimization import SASA, RMSProp, AdaGrad
 from viabel.objectives import VariationalObjective
 
 import autograd.numpy as anp
@@ -41,4 +41,21 @@ def test_sasa_rmsprop_optimize():
         true_value = np.zeros_like(scales) 
         dim = int(true_value.size/2)
         sasa = SASA(RMSProp(0.0001), dim)
+        _test_optimizer(sasa, objective, true_value, 40000)
+
+
+def test_sgd_adagrad_optimize():
+    for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
+        objective = DummyObjective(noise=.2, scales=scales)
+        true_value = np.zeros_like(scales)
+        sgd = AdaGrad(0.01)
+        _test_optimizer(sgd, objective, true_value, 40000)
+
+        
+def test_sasa_adagrad_optimize():
+    for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
+        objective = DummyObjective(noise=.2, scales=scales)
+        true_value = np.zeros_like(scales) 
+        dim = int(true_value.size/2)
+        sasa = SASA(AdaGrad(0.01), dim)
         _test_optimizer(sasa, objective, true_value, 40000)
