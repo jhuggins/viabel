@@ -4,7 +4,7 @@ from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import adagrad_optimize
+from viabel.optimization import SASA, RMSProp
 from viabel._psis import psislw
 
 all = [
@@ -13,10 +13,10 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, **kwargs):
+def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, learning_rate=0.01, RMS_kwargs=dict(), SASA_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
-    Currently the objective is optimized using ``viabel.optimization.adagrad_optimize``.
+    Currently the objective is optimized using ``viabel.optimization.SASA``.
 
     Parameters
     ----------
@@ -40,8 +40,10 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         ``log_density`` cannot be given.
     init_var_param
         Initial variational parameter.
-    **kwargs
-        Keyword arguments to pass to ``adagrad_optimize``.
+    RMS_kwargs : `dict`
+        Dictionary of keyword arguments to pass to ``RMSProp``.
+    SASA_kwargs : `dict`
+         Dictionary of keyword arguments to pass to ``SASA``.
 
     Returns
     -------
@@ -68,12 +70,11 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    var_param, var_param_history, _, _ = adagrad_optimize(n_iters,
-                                                          objective,
-                                                          init_var_param,
-                                                          **kwargs)
-    results = dict(var_param=var_param,
-                   var_param_history=var_param_history,
+    sasa = SASA(RMSProp(learning_rate, **RMS_kwargs), dimension, **SASA_kwargs)
+    sasa_results = sasa.optimize(n_iters, objective, init_var_param)
+    
+    results = dict(var_param=sasa_results['smoothed_opt_param'],
+                   var_param_history=sasa_results['variational_param_history'],
                    objective=objective)
     return results
 

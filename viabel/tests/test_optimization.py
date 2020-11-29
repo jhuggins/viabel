@@ -1,4 +1,4 @@
-from viabel.optimization import adagrad_optimize
+from viabel.optimization import SASA, RMSProp, AdaGrad
 from viabel.objectives import VariationalObjective
 
 import autograd.numpy as anp
@@ -18,19 +18,44 @@ class DummyObjective:
         return self.objective_fun(x), noisy_grad
 
 
-def _test_optimizer(opt, objective, true_value, n_iters, **kwargs):
+def _test_optimizer(opt_class, objective, true_value, n_iters, **kwargs):
     np.random.seed(851)
     dim = true_value.size
     init_param = true_value + np.random.randn(dim) / np.sqrt(dim)
-    var_param, var_param_history, _, _ = opt(n_iters, objective, init_param, **kwargs)
+    results = opt_class.optimize(n_iters, objective, init_param)
     # var_param_history[-1]
-    np.testing.assert_almost_equal(var_param, true_value, decimal=2)
+    np.testing.assert_almost_equal(results['smoothed_opt_param'], true_value, decimal=2)
 
 
-def test_adagrad_optimize():
+def test_sgd_rmsprop_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         objective = DummyObjective(noise=.2, scales=scales)
         true_value = np.zeros_like(scales)
-        _test_optimizer(adagrad_optimize, objective, true_value,
-                        40000, epsilon=1e-8,
-                        learning_rate_end=.0001)
+        sgd = RMSProp(0.0001)
+        _test_optimizer(sgd, objective, true_value, 40000)
+
+        
+def test_sasa_rmsprop_optimize():
+    for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
+        objective = DummyObjective(noise=.2, scales=scales)
+        true_value = np.zeros_like(scales) 
+        dim = int(true_value.size/2)
+        sasa = SASA(RMSProp(0.0001), dim)
+        _test_optimizer(sasa, objective, true_value, 40000)
+
+
+def test_sgd_adagrad_optimize():
+    for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
+        objective = DummyObjective(noise=.2, scales=scales)
+        true_value = np.zeros_like(scales)
+        sgd = AdaGrad(0.01)
+        _test_optimizer(sgd, objective, true_value, 40000)
+
+        
+def test_sasa_adagrad_optimize():
+    for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
+        objective = DummyObjective(noise=.2, scales=scales)
+        true_value = np.zeros_like(scales) 
+        dim = int(true_value.size/2)
+        sasa = SASA(AdaGrad(0.01), dim)
+        _test_optimizer(sasa, objective, true_value, 40000)
