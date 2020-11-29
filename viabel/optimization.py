@@ -87,7 +87,7 @@ class StochasticGradientOptimizer(Optimizer):
         descent_dir : `numpy.ndarray`, shape(var_param_dim,)
             Descent direction of the optimization algorithm
         history 
-            History of the decaying estimated squared gradient
+            Additional information needed for computing future descent directions.
         """
         pass
 

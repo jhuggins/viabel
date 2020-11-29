@@ -13,7 +13,7 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, learning_rate=0.01, **kwargs):
+def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, learning_rate=0.01, RMS_kwargs=dict(), SASA_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
     Currently the objective is optimized using ``viabel.optimization.SASA``.
@@ -40,8 +40,10 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         ``log_density`` cannot be given.
     init_var_param
         Initial variational parameter.
-    **kwargs
-        Keyword arguments to pass to ``SASA`` and ``RMSProp``.
+    RMS_kwargs : `dict`
+        Dictionary of keyword arguments to pass to ``RMSProp``.
+    SASA_kwargs : `dict`
+         Dictionary of keyword arguments to pass to ``SASA``.
 
     Returns
     -------
@@ -68,7 +70,7 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    sasa = SASA(RMSProp(learning_rate, **kwargs), dimension, **kwargs)
+    sasa = SASA(RMSProp(learning_rate, **RMS_kwargs), dimension, **SASA_kwargs)
     sasa_results = sasa.optimize(n_iters, objective, init_var_param)
     
     results = dict(var_param=sasa_results['smoothed_opt_param'],
