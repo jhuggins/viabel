@@ -13,7 +13,10 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, learning_rate=0.01, RMS_kwargs=dict(), SASA_kwargs=dict()):
+def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
+         approx=None, objective=None, fit=None, adaptive=True,
+         init_var_param=None, learning_rate=0.1,
+         RMS_kwargs=dict(), SASA_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
     Currently the objective is optimized using ``viabel.optimization.SASA``.
@@ -22,27 +25,31 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
     ----------
     dimension : `int`
         Dimension of the model parameter.
-    n_iters : `int`
+    n_iters : `int`, optional
         Number of iterations of the optimization.
-    num_mc_samples : `int`
+    num_mc_samples : `int`, optional
         Number of Monte Carlo samples to use for estimating the gradient of
         the objective.
-    log_density : `function`
+    log_density : `function`, optional
         (Unnormalized) log density of the model. Must support automatic
         differentiation with ``autograd``. Either ``log_density`` or ``fit``
         must be provided.
-    approx : `ApproximationFamily` object
+    approx : `ApproximationFamily` object, optional
         The approximation family. The default is to use ``viabel.approximations.MFGaussian``.
     objective : `VariationalObjective` class
         The default is to use ``viabel.objectives.ExclusiveKL``.
-    fit : `StanFit4model` object
+    fit : `StanFit4model` object, optional
         If provided, a ``StanModel`` will be used. Both ``fit`` and
         ``log_density`` cannot be given.
-    init_var_param
+    init_var_param, optional
         Initial variational parameter.
-    RMS_kwargs : `dict`
+    adaptive : `bool`, optional
+        If ``True``, use ``SASA`` with ``RMSProp``. Otherwise use ``RMSProp``.
+    learning_rate : `float`
+        Tuning parameter that determines the step size.
+    RMS_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to ``RMSProp``.
-    SASA_kwargs : `dict`
+    SASA_kwargs : `dict`, optional
          Dictionary of keyword arguments to pass to ``SASA``.
 
     Returns
@@ -70,11 +77,15 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    sasa = SASA(RMSProp(learning_rate, **RMS_kwargs), dimension, **SASA_kwargs)
-    sasa_results = sasa.optimize(n_iters, objective, init_var_param)
-    
-    results = dict(var_param=sasa_results['smoothed_opt_param'],
-                   var_param_history=sasa_results['variational_param_history'],
+    base_opt = RMSProp(learning_rate, **RMS_kwargs)
+    if adaptive:
+        opt = SASA(base_opt, dimension, **SASA_kwargs)
+    else:
+        opt = base_opt
+    opt_results = opt.optimize(n_iters, objective, init_var_param)
+
+    results = dict(var_param=opt_results['smoothed_opt_param'],
+                   var_param_history=opt_results['variational_param_history'],
                    objective=objective)
     return results
 
