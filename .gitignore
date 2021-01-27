@@ -4,6 +4,7 @@ __pycache__/
 
 # pickles
 *.pkl
+*.pck
 
 # C extensions
 *.so

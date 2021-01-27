@@ -1,5 +1,5 @@
 from viabel.approximations import MFStudentT
-from viabel.optimization import SASA, RMSProp
+from viabel.optimization import RAABBVI, RMSProp
 from viabel.objectives import ExclusiveKL, AlphaDivergence
 
 import autograd.numpy as anp

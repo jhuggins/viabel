@@ -1,10 +1,9 @@
 import numpy as np
-
 from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import SASA, RMSProp
+from viabel.optimization import RAABBVI, RMSProp
 from viabel._psis import psislw
 
 all = [
@@ -15,11 +14,11 @@ all = [
 
 def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
          approx=None, objective=None, fit=None, adaptive=True,
-         init_var_param=None, learning_rate=0.1,
-         RMS_kwargs=dict(), SASA_kwargs=dict()):
+         init_var_param=None, learning_rate=0.1, 
+         RMS_kwargs=dict(), RAABBVI_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
-    Currently the objective is optimized using ``viabel.optimization.SASA``.
+    Currently the objective is optimized using ``viabel.optimization.RAABBVI``.
 
     Parameters
     ----------
@@ -44,13 +43,13 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
     init_var_param, optional
         Initial variational parameter.
     adaptive : `bool`, optional
-        If ``True``, use ``SASA`` with ``RMSProp``. Otherwise use ``RMSProp``.
+        If ``True``, use ``RAABBVI`` with ``RMSProp``. Otherwise use ``RMSProp``.
     learning_rate : `float`
         Tuning parameter that determines the step size.
     RMS_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to ``RMSProp``.
-    SASA_kwargs : `dict`, optional
-         Dictionary of keyword arguments to pass to ``SASA``.
+    RAABBVI_kwargs : `dict`, optional
+         Dictionary of keyword arguments to pass to ``RAABBVI``.
 
     Returns
     -------
@@ -79,7 +78,7 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         init_var_param = approx.init_param()
     base_opt = RMSProp(learning_rate, **RMS_kwargs)
     if adaptive:
-        opt = SASA(base_opt, dimension, **SASA_kwargs)
+        opt = RAABBVI(base_opt, dimension, **RAABBVI_kwargs)
     else:
         opt = base_opt
     opt_results = opt.optimize(n_iters, objective, init_var_param)

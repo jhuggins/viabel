@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 import tqdm
 import autograd.numpy as np
-from scipy.stats import t as tdist
 from viabel.approximations import MFGaussian
+from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
+from viabel._utils import StanModel_cache
+
 
 __all__ = [
     'Optimizer',
     'StochasticGradientOptimizer',
     'RMSProp',
     'AdaGrad',
-    'SASA'
+    'RAABBVI'
 ]
 
 
@@ -125,7 +127,6 @@ class RMSProp(StochasticGradientOptimizer):
         descent_dir = grad / np.sqrt(self._jitter+history)
         return (descent_dir, history)
 
-
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
@@ -141,67 +142,68 @@ class AdaGrad(StochasticGradientOptimizer):
         return (descent_dir, history)
 
 
-class SASA(Optimizer):
-    """A class of Statistical Adaptive Stochastic Gradient Optimizer
+class RAABBVI(Optimizer):
+    """A robust, automated, and accurate BBVI optimizer
 
     Parameters
     ----------
     sgo : `class`
         A subclass of StochasticGradientOptimizer
     dim : `int`
-        dimension of the underlyin parameter space
-    theta : `float`, optional
-        Fraction of the samples to use for testing. The default is 1/8
+        dimension of the underlying parameter space
     rho : `float`, optional
         Learning rate reducing factor. The default is 0.5
-    W0 : `int`, optional
-        Minimum number of samples for tesing. The default is 1000.
-    t_check : `int`, optional
-        Period to perform statistical test. The default is 100.
-    delta : `float, optional
-        Significance level to compute the confidence interval. The default is 0.05.
     eps : `float`, optional
-        Threshold to determine the stopping iterations. The default is 1e-3.
+        Threshold to determine the stopping iterations. The default is 0.1.
+    tol :`float` optional
+        Tolerance level to determine MCSE of variational estimates. The default
+        is same as eps (0.1).
+    W_min : `int`, optional
+        Minimum window size for checking convergence. The default is 200.
+    k_check : `int`, optional
+        Frequency with which to check convergence. The default is `W_min`.
     """
-    def __init__(self, sgo, dim, theta=1/8, rho=0.5, W0 = 1000, t_check = 100, delta = 0.05, eps = 1e-3):
+    def __init__(self, sgo, dim, rho=0.5, eps=0.1, tol=None, W_min=200, k_check=None):
         if not isinstance(sgo, StochasticGradientOptimizer):
             raise ValueError('sgo must be a subclass of StochasticGradientOptimizer')
         self._sgo = sgo
         self._dim = dim
-        self._theta = theta
         self._rho = rho
-        self._W0 = W0
-        self._t_check = t_check
-        self._delta = delta
         self._eps = eps
+        self._tol = eps if tol is None else tol
+        self._W_min = W_min
+        self._k_check = W_min if k_check is None else k_check
 
-    def convergence_check(self, W, Delta_history):
+    def weighted_linear_regression(self, model, y, x, s=4, a=0.25):
         """
         Parameters
         ----------
-        W : `int`
-            Window size to use for the convergence check
-        Delta_history : `numpy.ndarray`
-            Computed Delta values
+        model : `pystan model`
+            Pystan model to conduct the sampling
+        y : `numpy_ndarray`
+            Response variable
+        x : `numpy_ndarray`
+            Predictor variable
 
         Returns
         -------
-        bool
-            Indicates whether the convergence reached or not
+        kappa : `float`
+            Power
+        c : `float`
+            Constant 
         """
-        m = b = np.floor(np.sqrt(W)).astype(int)
-        Delta_reshaped = np.reshape(Delta_history[-m*b:],(m,b))
-        mu_n = np.mean(Delta_reshaped)
-        Delta_batch_means = np.mean(Delta_reshaped,axis=1)
-        sigma_n = np.sqrt((m/(b-1))* np.sum((Delta_batch_means - mu_n)**2))
-        sd_error = tdist.ppf(1-self._delta/2, df=b-1) * (sigma_n/np.sqrt(m*b))
-        lower = mu_n - sd_error
-        upper = mu_n + sd_error
-
-        if lower < 0 and upper > 0:
-            return True, lower, upper
-        else:
-            return False, lower, upper
+        def initfun(kappa, log_c, sigma, chain_id=1):
+            return dict(kappa=kappa, log_c=log_c, sigma=sigma)
+        N = len(y)
+        w = 1/(1 + np.arange(N)[::-1]**2/s**2)**a
+        n_chains = 4
+        data = dict(N=N, y=y, x=x, rho=self._rho, w=np.array(w))
+        init = [initfun(0.5, 100, 5, chain_id=i) for i in range(n_chains) ]
+        fit = model.sampling(data=data, init=init, iter=1000, chains=n_chains,
+                             control=dict(adapt_delta=0.95))
+        kappa = np.mean(fit['kappa'])
+        c = np.exp(np.mean(fit['log_c']))
+        return kappa, c
 
 
     def optimize(self, n_iters, objective, init_param):
@@ -231,53 +233,94 @@ class SASA(Optimizer):
             print('Approximation does not support KL. Using base stochastic'
                   ' optimization algorithm instead.', flush=True)
             return self._sgo.optimize(n_iters, objective, init_param)
-        t0 = 0
-        history = None
+
+        k0 = 0
+        k_conv = None # Iteration number when reached convergence
+        history = None # Information needed to compute descent direction in optimization algorithm
+        success = False
         learning_rate = self._sgo._learning_rate
+        model = StanModel_cache(model_name='weighted_lin_regression')
         variational_param = init_param.copy()
         variational_param_mean = init_param.copy()
-        value_history = []
-        Delta_history = []
         variational_param_history = []
-        lower = upper = np.nan
+        value_history = []
+        SKL_history = []
+        learn_rate_hist = []
         stopped = False
         with tqdm.trange(n_iters) as progress:
             try:
-                for t in progress:
+                for k in progress:
                     object_val, object_grad = objective(variational_param)
                     value_history.append(object_val)
                     descent_dir, history = self._sgo.descent_direction(object_grad, history)
-                    # must be computed before updated variational parameter
-                    Delta = np.dot(variational_param, descent_dir) - 0.5*learning_rate*np.sum(descent_dir**2)
-                    Delta_history.append(Delta)
                     variational_param -= learning_rate * descent_dir
                     variational_param_history.append(variational_param.copy())
-                    W = np.max([np.min([t-t0, self._W0]), np.ceil(self._theta*(t-t0)).astype(int)])
-                    if (W >= self._W0) and (t % self._t_check == 0):
-                        convg, lower, upper = self.convergence_check(W, Delta_history)
-                        if convg == True:
-                            m = b = np.floor(np.sqrt(W)).astype(int)
+
+                    # when convergence has not been reached check if the
+                    # recheck for convergence using R_hat approach
+                    if k_conv is None and k % self._k_check == 0:
+                        W_upper = int(0.95*k)
+                        if W_upper > self._W_min:
+                            windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
+                            W = R_hat_convergence_check(variational_param_history, windows)
+                            if W is not None:
+                                k_conv = k-W-k0
+                                W_check = W  # immediately check MCSE
+
+                    # Once convergence has been reached compute the MCS
+                    if k_conv is not None and k - k_conv - k0 == W_check:
+                        W = W_check
+                        if isinstance(objective.approx, MFGaussian):
+                            # For MF Gaussian, use MCSE(mu/sigma,log_sigma)
+                            var_param_log_sd = np.array(variational_param_history)[-W:,-self._dim:]
+                            var_param_mu = np.array(variational_param_history)[-W:,self._dim:]
+                            var_param_mu_stand = var_param_mu/np.exp(var_param_log_sd)
+                            var_param_new = np.concatenate((var_param_mu_stand,var_param_log_sd),axis=1)
+                            mcse = MCSE(var_param_new)
+                        else:
+                            var_param = np.array(variational_param_history)[-W:,:]
+                            mcse = MCSE(var_param)
+                        if np.mean(mcse) < self._tol:
+                            success = True
                             learning_rate = self._rho * learning_rate
+                            learn_rate_hist.append(learning_rate)
                             variational_param_mean_prev = variational_param_mean
-                            variational_param_mean = np.mean(np.array(variational_param_history[-m*b:]), axis=0)
-                            t0 = t
-                            SKL = objective.approx.kl(variational_param_mean_prev, variational_param_mean) + objective.approx.kl(variational_param_mean, variational_param_mean_prev)
-                            if (SKL/self._rho < self._eps):
-                                stopped = True
-                                break
-                    if t % 10 == 0:
-                        avg_loss = np.mean(value_history[max(0, t - 1000):t + 1])
+                            variational_param_mean = np.mean(np.array(variational_param_history[-W:]), axis=0)
+                            variational_param = variational_param_mean
+                            if len(learn_rate_hist) > 1:
+                                SKL = (objective.approx.kl(variational_param_mean_prev, variational_param_mean) +
+                                       objective.approx.kl(variational_param_mean, variational_param_mean_prev))
+                                SKL_history.append(SKL)
+                            k_conv = None
+                            k0 = k
+                            # Conduct weighted linear regression to estimate parameters
+                            # for the stopping rule
+                            if len(SKL_history) > 0:
+                                y = np.log(SKL_history)
+                                x = np.log(learn_rate_hist[:-1])
+                                kappa, c = self.weighted_linear_regression(model, y, x)
+                                if (c * learn_rate_hist[-2]**(2*kappa) < self._eps**2):
+                                    stopped = True
+                                    break
+                        else:
+                            W_check = int(1.25*W_check)
+
+
+                    if k % 10 == 0:
+                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
                         progress.set_description(
-                            'average loss = {:,.5g} | learning rate = {:,.5g} | ({:,.5g}, {:,.5g})'.format(avg_loss, learning_rate, lower, upper))
+                            'average loss = {:,.5g} | learning rate = {:,.5g} |'.format(avg_loss, learning_rate))
             except (KeyboardInterrupt, StopIteration) as e:  # pragma: no cover
                 # do not print log on the same line
                 progress.close()
             finally:
                 progress.close()
+        if not success:
+            UserWarning('Failed to converge')
         if stopped:
-            print('Stopping rule reached at iteration', t)
-        if t - t0 > self._W0:
-            variational_param_mean = np.mean(np.array(variational_param_history[-self._W0:]), axis = 0)
+            print('Stopping rule reached at iteration', k)
+        if k - k0 > self._W_min:
+            variational_param_mean = np.mean(np.array(variational_param_history[-self._W_min:]), axis = 0)
         return dict(smoothed_opt_param = variational_param_mean,
                     variational_param_history = variational_param_history,
                     value_history = np.array(value_history))
