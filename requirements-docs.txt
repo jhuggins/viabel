@@ -2,6 +2,7 @@ sphinx>=1.4
 ipython
 matplotlib
 seaborn
+pystan
 numpydoc
 sphinx-copybutton
 sphinx_rtd_theme
