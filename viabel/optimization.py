@@ -179,7 +179,7 @@ class RAABBVI(Optimizer):
     k_check : `int`, optional
         Frequency with which to check convergence. The default is `W_min`.
     """
-    def __init__(self, sgo, dim, rho=0.5, eps=1e-3, tol=0.1, W_min=200, k_check=200):
+    def __init__(self, sgo, dim, rho=0.5, eps=0.1, tol=0.1, W_min=200, k_check=200):
         if not isinstance(sgo, StochasticGradientOptimizer):
             raise ValueError('sgo must be a subclass of StochasticGradientOptimizer')
         self._sgo = sgo
@@ -315,7 +315,7 @@ class RAABBVI(Optimizer):
                                 y = np.log(SKL_history)
                                 x = np.log(learn_rate_hist[:-1])
                                 kappa, c = self.weighted_linear_regression(model, y, x)
-                                if (c * learn_rate_hist[-2]**(2*kappa) < self._eps):
+                                if (c * learn_rate_hist[-2]**(2*kappa) < self._eps**2):
                                     stopped = True
                                     break
                         else:
