@@ -18,8 +18,8 @@ def test_bbvi():
     # iterate averaging introduces some bias, so use last iterate
     est_mean, est_cov = results['objective'].approx.mean_and_cov(results['var_param']) #results['var_param_history'][-1])
     est_stdev = np.sqrt(np.diag(est_cov))
-    np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
-    np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+    np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=1)
+    np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=1)
 
     with pytest.raises(ValueError):
         convenience.bbvi(2)

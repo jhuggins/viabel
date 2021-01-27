@@ -170,7 +170,7 @@ class RAABBVI(Optimizer):
     rho : `float`, optional
         Learning rate reducing factor. The default is 0.5
     eps : `float`, optional
-        Threshold to determine the stopping iterations. The default is 0.01.
+        Threshold to determine the stopping iterations. The default is 0.1.
     tol :`float` optional
         Tolerance level to determine MCSE of variational estimates. The default
         is 0.1.
@@ -197,9 +197,9 @@ class RAABBVI(Optimizer):
         model : `pystan model`
             Pystan model to conduct the sampling
         y : `numpy_ndarray`
-            Response variable: log(SKL)
+            Response variable
         x : `numpy_ndarray`
-            Predictor variable: log(\gamma) + log((1-\rho)/\rho)
+            Predictor variable
 
         Returns
         -------

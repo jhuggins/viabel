@@ -18,7 +18,7 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
          RMS_kwargs=dict(), RAABBVI_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
-    Currently the objective is optimized using ``viabel.optimization.SASA``.
+    Currently the objective is optimized using ``viabel.optimization.RAABBVI``.
 
     Parameters
     ----------
@@ -43,7 +43,7 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
     init_var_param, optional
         Initial variational parameter.
     adaptive : `bool`, optional
-        If ``True``, use ``SASA`` with ``RMSProp``. Otherwise use ``RMSProp``.
+        If ``True``, use ``RAABBVI`` with ``RMSProp``. Otherwise use ``RMSProp``.
     learning_rate : `float`
         Tuning parameter that determines the step size.
     RMS_kwargs : `dict`, optional
