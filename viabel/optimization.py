@@ -127,22 +127,6 @@ class RMSProp(StochasticGradientOptimizer):
         descent_dir = grad / np.sqrt(self._jitter+history)
         return (descent_dir, history)
 
-class RMSProp_modified(StochasticGradientOptimizer):
-    """RMSprop optimization method
-    """
-    def __init__(self, learning_rate, beta=0.9, jitter=1e-8):
-        self._beta = beta
-        self._jitter = jitter
-        super().__init__(learning_rate)
-
-    def descent_direction(self, grad, history):
-        if history is None:
-            history  = grad**2
-        descent_dir = grad / np.sqrt(self._jitter+history)
-        history = history*self._beta + (1.-self._beta)*grad**2
-        return (descent_dir, history)
-
-
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
@@ -173,20 +157,20 @@ class RAABBVI(Optimizer):
         Threshold to determine the stopping iterations. The default is 0.1.
     tol :`float` optional
         Tolerance level to determine MCSE of variational estimates. The default
-        is 0.1.
+        is same as eps (0.1).
     W_min : `int`, optional
         Minimum window size for checking convergence. The default is 200.
     k_check : `int`, optional
         Frequency with which to check convergence. The default is `W_min`.
     """
-    def __init__(self, sgo, dim, rho=0.5, eps=0.1, tol=0.1, W_min=200, k_check=200):
+    def __init__(self, sgo, dim, rho=0.5, eps=0.1, tol=None, W_min=200, k_check=None):
         if not isinstance(sgo, StochasticGradientOptimizer):
             raise ValueError('sgo must be a subclass of StochasticGradientOptimizer')
         self._sgo = sgo
         self._dim = dim
         self._rho = rho
         self._eps = eps
-        self._tol = tol
+        self._tol = eps if tol is None else tol
         self._W_min = W_min
         self._k_check = W_min if k_check is None else k_check
 
