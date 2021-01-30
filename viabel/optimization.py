@@ -11,6 +11,7 @@ __all__ = [
     'StochasticGradientOptimizer',
     'RMSProp',
     'AdaGrad',
+    'WindowedAdaGrad',
     'RAABBVI'
 ]
 
@@ -127,6 +128,26 @@ class RMSProp(StochasticGradientOptimizer):
         descent_dir = grad / np.sqrt(self._jitter+history)
         return (descent_dir, history)
 
+
+class WindowedAdaGrad(StochasticGradientOptimizer):
+    """Adam optimization method
+    """
+    def __init__(self, learning_rate, window_size=10, jitter=1e-8):
+        self._window_size = window_size
+        self._jitter = jitter
+        super().__init__(learning_rate)
+
+    def descent_direction(self, grad, history):
+        if history is None:
+            history  = []
+        history.append(grad**2)
+        if len(history) > self._window_size:
+            history.pop(0)
+        mean_grad_squared = np.mean(history, axis=0)
+        descent_dir = grad / np.sqrt(self._jitter+mean_grad_squared)
+        return (descent_dir, history)
+
+
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
@@ -190,7 +211,7 @@ class RAABBVI(Optimizer):
         kappa : `float`
             Power
         c : `float`
-            Constant 
+            Constant
         """
         def initfun(kappa, log_c, sigma, chain_id=1):
             return dict(kappa=kappa, log_c=log_c, sigma=sigma)

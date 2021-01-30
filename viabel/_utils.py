@@ -23,7 +23,6 @@ def ensure_2d(a):
 
 def _data_file_path(filename):
     """Returns the path to an internal file"""
-    print(__file__)
     return os.path.abspath(os.path.join(__file__, '../data', filename))
 
 def _stan_model_cache_dir():
@@ -42,8 +41,6 @@ def StanModel_cache(model_code=None, model_name=None, **kwargs):
         if model_name is None:
             raise ValueError('Either model_code or model_name must be provided')
         model_file = _data_file_path(model_name + '.stan')
-        print('model_file =', model_file)
-        print(os.listdir(os.path.dirname(model_file)))
         if not os.path.isfile(model_file):
             raise ValueError('invalid model "{}"'.format(model_name))
         with open(model_file) as f:
