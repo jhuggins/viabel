@@ -56,5 +56,5 @@ def test_raabbvi_rmsprop_optimize():
         objective = DummyObjective(noise=.2, scales=scales)
         true_value = np.zeros_like(scales)
         dim = int(true_value.size/2)
-        sasa = RAABBVI(RMSProp(0.1), dim)
+        sasa = RAABBVI(RMSProp(0.1), dim, eps=0.01)
         _test_optimizer(sasa, objective, true_value, 10000)

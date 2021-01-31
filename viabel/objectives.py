@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from autograd import value_and_grad, vector_jacobian_product
+from autograd.core import getval
 
 import autograd.numpy as np
 import autograd.numpy.random as npr
@@ -105,10 +106,8 @@ class ExclusiveKL(StochasticVariationalObjective):
         approx = self.approx
         def variational_objective(var_param):
             samples = approx.sample(var_param, self.num_mc_samples)
-            if approx.supports_entropy:
-                lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
-            else:
-                lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
+            var_param_stopped = getval(var_param)
+            lower_bound = np.mean(self.model(samples) - approx.log_density(var_param_stopped, samples))
             return -lower_bound
         self._objective_and_grad = value_and_grad(variational_objective)
 

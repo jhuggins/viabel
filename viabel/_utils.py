@@ -33,8 +33,8 @@ def clear_stan_model_cache():
     stan_model_dir =_stan_model_cache_dir()
     if os.path.exists(stan_model_dir):
         shutil.rmtree(stan_model_dir)
-        
-        
+
+
 def StanModel_cache(model_code=None, model_name=None, **kwargs):
     """Use just as you would `StanModel`"""
     if model_code is None:
