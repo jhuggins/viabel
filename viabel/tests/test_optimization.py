@@ -63,5 +63,5 @@ def test_faso_rmsprop_optimize():
     for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = FASO(RMSProp(0.01), mcse_threshold=.005)
+        sgd = FASO(RMSProp(0.01), mcse_threshold=.002)
         _test_optimizer(sgd, objective, true_value, 20000)
