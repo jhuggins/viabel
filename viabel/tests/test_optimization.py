@@ -1,4 +1,4 @@
-from viabel.optimization import RAABBVI, RMSProp, AdaGrad
+from viabel.optimization import FASO, RMSProp, AdaGrad, WindowedAdaGrad
 from viabel.objectives import VariationalObjective
 
 import autograd.numpy as anp
@@ -15,10 +15,10 @@ class DummyApproximationFamily:
 
 
 class DummyObjective:
-    """Simple quadratic dummy objective with artifical Gaussian gradiet noise"""
-    def __init__(self, noise=1, scales=1):
+    """Simple quadratic dummy objective with artifical Gaussian gradient noise"""
+    def __init__(self, target, noise=1, scales=1):
         self._noise = noise
-        self.objective_fun = lambda x: .5*anp.sum((x/scales)**2)
+        self.objective_fun = lambda x: .5*anp.sum(((x-target)/scales)**2)
         self.grad_objective_fun = grad(self.objective_fun)
         self.approx = DummyApproximationFamily()
 
@@ -32,29 +32,36 @@ def _test_optimizer(opt_class, objective, true_value, n_iters, **kwargs):
     dim = true_value.size
     init_param = true_value + np.random.randn(dim) / np.sqrt(dim)
     results = opt_class.optimize(n_iters, objective, init_param)
-    np.testing.assert_almost_equal(results['smoothed_opt_param'], true_value, decimal=2)
+    np.testing.assert_almost_equal(results['opt_param'], true_value, decimal=2)
 
 
 def test_rmsprop_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
-        objective = DummyObjective(noise=.2, scales=scales)
-        true_value = np.zeros_like(scales)
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = RMSProp(0.01)
-        _test_optimizer(sgd, objective, true_value, 10000)
+        _test_optimizer(sgd, objective, true_value, 20000)
 
 
 def test_adagrad_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
-        objective = DummyObjective(noise=.2, scales=scales)
-        true_value = np.zeros_like(scales)
-        sgd = AdaGrad(0.01)
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
+        sgd = AdaGrad(0.1)
         _test_optimizer(sgd, objective, true_value, 20000)
 
 
-def test_raabbvi_rmsprop_optimize():
+def test_windowed_adagrad_optimize():
+    for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
+        sgd = WindowedAdaGrad(0.01)
+        _test_optimizer(sgd, objective, true_value, 20000)
+
+
+def test_faso_rmsprop_optimize():
     for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
-        objective = DummyObjective(noise=.2, scales=scales)
-        true_value = np.zeros_like(scales)
-        dim = int(true_value.size/2)
-        sasa = RAABBVI(RMSProp(0.1), dim, eps=0.01)
-        _test_optimizer(sasa, objective, true_value, 10000)
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
+        sgd = FASO(RMSProp(0.01), mcse_threshold=.005)
+        _test_optimizer(sgd, objective, true_value, 20000)

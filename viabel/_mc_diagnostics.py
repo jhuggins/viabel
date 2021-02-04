@@ -1,7 +1,6 @@
 import autograd.numpy as np
 from scipy.fftpack import next_fast_len
-import  warnings
-
+import warnings
 
 
 def autocov(samples, axis=-1):
@@ -34,6 +33,7 @@ def autocov(samples, axis=-1):
             cov = np.fft.irfft(ifft_samp, n=m, axis=axis)[shape]
             cov /= n
             return cov
+
 
 def ess(samples):
     """
@@ -96,15 +96,15 @@ def ess(samples):
         ess = np.nan
     return ess
 
+
 def MCSE(sample):
     """
-    Computing the Monte Carlo standard error(MCSE)
+    Compute the Monte Carlo standard error (MCSE)
 
     Parameters
     ----------
     samples : `numpy.ndarray(n_iters, 2*dim)`
         An array containing variational samples
-
 
     Returns
     -------
@@ -116,9 +116,10 @@ def MCSE(sample):
     sd_dev = np.sqrt(np.var(sample,ddof=1,axis=0))
     eff_samp = [ess(sample[:,i].reshape(1,n_iters)) for i in range(d)]
     mcse = sd_dev/np.sqrt(eff_samp)
-    return mcse
+    return eff_samp, mcse
 
-def compute_R_hat(chains, warmup=0, jitter = 1e-8):
+
+def compute_R_hat(chains, warmup=0, jitter=1e-8):
     """
     Computing R hat values using split R hat approach
 
@@ -156,7 +157,8 @@ def compute_R_hat(chains, warmup=0, jitter = 1e-8):
     R_hat = np.sqrt(var_hat)
     return R_hat
 
-def R_hat_convergence_check(samples, windows):
+
+def R_hat_convergence_check(samples, windows, Rhat_threshold=1.1):
     """
     Convergence check of samples using R_hat
 
@@ -169,13 +171,12 @@ def R_hat_convergence_check(samples, windows):
 
     Returns
     -------
-    W : `int`
-        Best window size, or None if none met convergence criterion
-
+    success: `bool`
+        Whether the convergence criterion is met
+    best_W: `int`
+        Best window size
     """
     R_hat_array = [np.max(compute_R_hat(np.array(samples[-window:]),0)) for window in windows]
     best_R_hat_ind = np.argmin(R_hat_array)
-    if R_hat_array[best_R_hat_ind] <= 1.1:
-        return windows[best_R_hat_ind]
-    else:
-        return None
+    success = R_hat_array[best_R_hat_ind] <= Rhat_threshold
+    return success, windows[best_R_hat_ind]
