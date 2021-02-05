@@ -39,6 +39,7 @@ setup(
     author_email='huggins@bu.edu',
     url='https://github.com/jhuggins/viabel/',
     packages=['viabel'],
+    include_package_data=True,
     install_requires=get_requirements(),
     extras_require={ 'docs' : get_requirements_docs(),
                      'dev' : get_requirements_dev()

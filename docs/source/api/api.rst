@@ -66,4 +66,4 @@ Optimization
    StochasticGradientOptimizer
    RMSProp
    AdaGrad
-   RAABBVI
+   FASO

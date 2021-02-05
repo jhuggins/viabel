@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from autograd import value_and_grad, vector_jacobian_product
+from autograd.core import getval
 
 import autograd.numpy as np
 import autograd.numpy.random as npr
@@ -101,11 +102,28 @@ class ExclusiveKL(StochasticVariationalObjective):
 
     Equivalent to using the canonical evidence lower bound (ELBO)
     """
+    def __init__(self, approx, model, num_mc_samples, use_path_deriv=False):
+            """
+            Parameters
+            ----------
+            approx : `ApproximationFamily` object
+            model : `Model` object
+            num_mc_sample : `int`
+                Number of Monte Carlo samples to use to approximate the objective.
+            use_path_deriv : `bool`
+                Use path derivative (for "sticking the landing") gradient estimator
+            """
+            self._use_path_deriv = use_path_deriv
+            super().__init__(approx, model, num_mc_samples)
+
     def _update_objective_and_grad(self):
         approx = self.approx
         def variational_objective(var_param):
             samples = approx.sample(var_param, self.num_mc_samples)
-            if approx.supports_entropy:
+            if self._use_path_deriv:
+                var_param_stopped = getval(var_param)
+                lower_bound = np.mean(self.model(samples) - approx.log_density(var_param_stopped, samples))
+            elif approx.supports_entropy:
                 lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
             else:
                 lower_bound = np.mean(self.model(samples) - approx.log_density(samples))

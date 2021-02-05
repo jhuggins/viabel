@@ -1,5 +1,5 @@
 from viabel.approximations import MFStudentT
-from viabel.optimization import RAABBVI, RMSProp
+from viabel.optimization import RMSProp
 from viabel.objectives import ExclusiveKL, AlphaDivergence
 
 import autograd.numpy as anp
@@ -21,7 +21,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     opt = RMSProp(0.1)
     opt_results = opt.optimize(10000, objective, init_param)
     # iterate averaging introduces some bias, so use last iterate
-    est_mean, est_cov = approx.mean_and_cov(opt_results['smoothed_opt_param'])
+    est_mean, est_cov = approx.mean_and_cov(opt_results['opt_param'])
     est_stdev = np.sqrt(np.diag(est_cov))
     print(est_stdev, stdev)
     np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=1)
@@ -30,6 +30,10 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
 
 def test_ExclusiveKL():
      _test_objective(ExclusiveKL, 100)
+
+
+def test_ExclusiveKL_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True)
 
 
 def test_AlphaDivergence():
