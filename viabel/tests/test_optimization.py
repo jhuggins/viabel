@@ -1,9 +1,12 @@
-from viabel.optimization import FASO, RMSProp, AdaGrad, WindowedAdaGrad
+from viabel.optimization import (StochasticGradientOptimizer, FASO, RMSProp,
+                                 AdaGrad, WindowedAdaGrad)
 from viabel.objectives import VariationalObjective
 
 import autograd.numpy as anp
 import numpy as np
 from autograd import grad
+
+import pytest
 
 
 class DummyApproximationFamily:
@@ -35,6 +38,21 @@ def _test_optimizer(opt_class, objective, true_value, n_iters, **kwargs):
     np.testing.assert_almost_equal(results['opt_param'], true_value, decimal=2)
 
 
+def test_sgo_optimize():
+    for scales in [np.ones(1), np.ones(3)]:
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
+        sgd = StochasticGradientOptimizer(0.01, diagnostics=True)
+        _test_optimizer(sgd, objective, true_value, 20000)
+
+
+def test_sgo_error_checks():
+    with pytest.raises(ValueError):
+        StochasticGradientOptimizer(0.01, iterate_avg_prop=0)
+    with pytest.raises(ValueError):
+        StochasticGradientOptimizer(0.01, iterate_avg_prop=1.01)
+
+
 def test_rmsprop_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
@@ -63,5 +81,18 @@ def test_faso_rmsprop_optimize():
     for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = FASO(RMSProp(0.01), mcse_threshold=.002)
+        sgd = FASO(RMSProp(0.01, diagnostics=True), mcse_threshold=.002)
         _test_optimizer(sgd, objective, true_value, 20000)
+
+
+def test_faso_error_checks():
+    with pytest.raises(ValueError):
+        FASO(FASO(RMSProp(0.01)))
+    with pytest.raises(ValueError):
+        FASO(RMSProp(0.01), mcse_threshold=0)
+    with pytest.raises(ValueError):
+        FASO(RMSProp(0.01), W_min=0)
+    with pytest.raises(ValueError):
+        FASO(RMSProp(0.01), k_check=0)
+    with pytest.raises(ValueError):
+        FASO(RMSProp(0.01), ESS_min=0)

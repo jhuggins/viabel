@@ -14,12 +14,14 @@ def test_bbvi():
     stdev = np.array([2.,5.])[np.newaxis,:]
     log_p = lambda x: anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     # use large number of MC samples to ensure accuracy
-    results = convenience.bbvi(2, log_density=log_p, num_mc_samples=50,
-                               FASO_kwargs=dict(mcse_threshold=.005))
-    est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
-    est_stdev = np.sqrt(np.diag(est_cov))
-    np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
-    np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+    for adaptive in [True, False]:
+        results = convenience.bbvi(2, log_density=log_p, num_mc_samples=50,
+                                   FASO_kwargs=dict(mcse_threshold=.005),
+                                   adaptive=adaptive, n_iters=30000)
+        est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
+        est_stdev = np.sqrt(np.diag(est_cov))
+        np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
+        np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
 
     with pytest.raises(ValueError):
         convenience.bbvi(2)

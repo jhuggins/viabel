@@ -43,7 +43,7 @@ class Optimizer(ABC):
 
 
 class StochasticGradientOptimizer(Optimizer):
-    """An abstract class of descent direction and a subclass of Optimizer
+    """Stochastic gradient descent.
     """
     def __init__(self, learning_rate, *, iterate_avg_prop=0.2, diagnostics=False):
         """
@@ -115,9 +115,10 @@ class StochasticGradientOptimizer(Optimizer):
                     descent_dir_history = np.array(descent_dir_history),
                     )
 
-    @abstractmethod
     def descent_direction(self, grad):
-        """Compute descent direction for optimization
+        """Compute descent direction for optimization.
+
+        Default implementation returns ``grad``.
 
         Parameters
         -----------
@@ -129,16 +130,17 @@ class StochasticGradientOptimizer(Optimizer):
         descent_dir : `numpy.ndarray`, shape(var_param_dim,)
             Descent direction of the optimization algorithm
         """
-        pass
+        return grad
 
 
 class RMSProp(StochasticGradientOptimizer):
     """RMSProp optimization method
     """
-    def __init__(self, learning_rate, *, beta=0.9, jitter=1e-8):
+    def __init__(self, learning_rate, *, beta=0.9, jitter=1e-8,
+                 diagnostics=False):
         self._beta = beta
         self._jitter = jitter
-        super().__init__(learning_rate)
+        super().__init__(learning_rate, diagnostics=diagnostics)
 
     def reset_state(self):
         self._avg_grad_sq = None
@@ -158,10 +160,11 @@ class RMSProp(StochasticGradientOptimizer):
 class WindowedAdaGrad(StochasticGradientOptimizer):
     """Adam optimization method
     """
-    def __init__(self, learning_rate, *, window_size=10, jitter=1e-8):
+    def __init__(self, learning_rate, *, window_size=10, jitter=1e-8,
+                 diagnostics=False):
         self._window_size = window_size
         self._jitter = jitter
-        super().__init__(learning_rate)
+        super().__init__(learning_rate, diagnostics=diagnostics)
 
     def reset_state(self):
         self._history = []
@@ -178,9 +181,9 @@ class WindowedAdaGrad(StochasticGradientOptimizer):
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
-    def __init__(self, learning_rate, *, jitter=1e-8):
+    def __init__(self, learning_rate, *, jitter=1e-8, diagnostics=False):
         self._jitter = jitter
-        super().__init__(learning_rate)
+        super().__init__(learning_rate, diagnostics=diagnostics)
 
     def reset_state(self):
         self._sum_grad_sq = 0
@@ -257,8 +260,6 @@ class FASO(Optimizer):
                         variational_param -= learning_rate * descent_dir
                         variational_param_history.append(variational_param.copy())
                     total_opt_time += opt_timer.interval
-                    if diagnostics:
-                        object_grad_hist.append(object_grad)
                     # If convergence has not been reached then check for
                     # convergence using R hat
                     if k_conv is None and k % self._k_check == 0:
@@ -270,7 +271,7 @@ class FASO(Optimizer):
                             iterate_average = np.mean(variational_param_history[-best_W:], axis=0)
                             if diagnostics:
                                 iterate_average_k_history.append(k)
-                                state.append(iterate_average)
+                                iterate_average_history.append(iterate_average)
                             if R_hat_success:
                                 k_conv = k - best_W
                                 W_check = best_W  # immediately check MCSE
@@ -280,9 +281,9 @@ class FASO(Optimizer):
                         W = W_check
                         converged_iterates = np.array(variational_param_history[-W:])
                         iterate_average = np.mean(converged_iterates, axis=0)
-                        if diagnostics and k not in k_history:
-                            state.append(iterate_average)
+                        if diagnostics and k not in iterate_average_k_history:
                             iterate_average_k_history.append(k)
+                            iterate_average_history.append(iterate_average)
                         # compute MCSE
                         with Timer() as mcse_timer:
                             if isinstance(objective.approx, MFGaussian):
