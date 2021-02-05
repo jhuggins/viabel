@@ -1,6 +1,7 @@
 import os
 import shutil
 import pickle
+import time
 import pystan
 from hashlib import md5
 import autograd.numpy as np
@@ -21,9 +22,21 @@ def ensure_2d(a):
     return a
 
 
+class Timer:
+    def __init__(self):
+        pass
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
+    def __exit__(self, *args):
+        self.end = time.perf_counter()
+        self.interval = self.end - self.start
+
+
 def _data_file_path(filename):
     """Returns the path to an internal file"""
     return os.path.abspath(os.path.join(__file__, '../data', filename))
+
 
 def _stan_model_cache_dir():
     return _data_file_path('cached-stan-models')

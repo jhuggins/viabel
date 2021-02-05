@@ -3,7 +3,7 @@ from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import RAABBVI, RMSProp
+from viabel.optimization import FASO, RMSProp
 from viabel._psis import psislw
 
 all = [
@@ -14,11 +14,11 @@ all = [
 
 def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
          approx=None, objective=None, fit=None, adaptive=True,
-         init_var_param=None, learning_rate=0.1, 
-         RMS_kwargs=dict(), RAABBVI_kwargs=dict()):
+         init_var_param=None, learning_rate=0.01,
+         RMS_kwargs=dict(), FASO_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
-    Currently the objective is optimized using ``viabel.optimization.RAABBVI``.
+    Currently the objective is optimized using ``viabel.optimization.FASO``.
 
     Parameters
     ----------
@@ -43,19 +43,18 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
     init_var_param, optional
         Initial variational parameter.
     adaptive : `bool`, optional
-        If ``True``, use ``RAABBVI`` with ``RMSProp``. Otherwise use ``RMSProp``.
+        If ``True``, use ``FASO`` with ``RMSProp``. Otherwise use ``RMSProp``.
     learning_rate : `float`
         Tuning parameter that determines the step size.
     RMS_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to ``RMSProp``.
-    RAABBVI_kwargs : `dict`, optional
-         Dictionary of keyword arguments to pass to ``RAABBVI``.
+    FASO_kwargs : `dict`, optional
+         Dictionary of keyword arguments to pass to ``FASO``.
 
     Returns
     -------
     results : `dict`
-        Contains the following entries: `var_param`, `var_param_history`,
-        `objective`
+        Contains the following entries: `objective` and results from optimizer
     """
     if objective is not None:
         if fit is not None or log_density is not None or approx is not None:
@@ -78,15 +77,12 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         init_var_param = approx.init_param()
     base_opt = RMSProp(learning_rate, **RMS_kwargs)
     if adaptive:
-        opt = RAABBVI(base_opt, dimension, **RAABBVI_kwargs)
+        opt = FASO(base_opt, **FASO_kwargs)
     else:
         opt = base_opt
     opt_results = opt.optimize(n_iters, objective, init_var_param)
-
-    results = dict(var_param=opt_results['smoothed_opt_param'],
-                   var_param_history=opt_results['variational_param_history'],
-                   objective=objective)
-    return results
+    opt_results['objective'] = objective
+    return opt_results
 
 
 def vi_diagnostics(var_param, *, objective=None, model=None, approx=None, n_samples=100000):
@@ -154,7 +150,7 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
     if results['d2'] > 4.6: # pragma: no cover
         print('WARNING: d2 > 4.6 means the approximation is very inaccurate')
     elif results['d2'] > 0.1:
-        print('WARNING: 0.1 > d2 < 4.6 means the approximation is somewhat '
+        print('WARNING: 0.1 < d2 < 4.6 means the approximation is somewhat '
               'inaccurate. Use importance sampling to decrease error.')
     else:
         print('\nAll diagnostics pass.')
