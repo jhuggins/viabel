@@ -346,5 +346,5 @@ class FASO(Optimizer):
                     iterate_average_history = np.array(iterate_average_history),
                     ess_and_mcse_k_history = np.array(ess_and_mcse_k_history),
                     ess_history = np.array(ess_history),
-                    mcse_history = np.array(ess_history)
+                    mcse_history = np.array(mcse_history)
                     )
