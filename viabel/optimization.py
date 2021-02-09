@@ -234,6 +234,7 @@ class FASO(Optimizer):
         diagnostics = self._sgo._diagnostics
         k_conv = None # Iteration number when reached convergence
         k_stopped = None # Iteration number when MCSE/ESS conditions met
+        k_Rhat = None # Iteration number when R hat convergence criterion met
         learning_rate = self._sgo._learning_rate
         variational_param = init_param.copy()
         variational_param_history = []
@@ -258,9 +259,10 @@ class FASO(Optimizer):
                         object_val, object_grad = objective(variational_param)
                         value_history.append(object_val)
                         descent_dir = self._sgo.descent_direction(object_grad)
-                        descent_dir_history.append(descent_dir)
                         variational_param -= learning_rate * descent_dir
                         variational_param_history.append(variational_param.copy())
+                        if diagnostics:
+                            descent_dir_history.append(descent_dir)
                     total_opt_time += opt_timer.interval
                     # If convergence has not been reached then check for
                     # convergence using R hat
