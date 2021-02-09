@@ -275,7 +275,7 @@ class FASO(Optimizer):
                                 iterate_average_k_history.append(k)
                                 iterate_average_history.append(iterate_average)
                             if R_hat_success:
-								k_Rhat = k
+                                k_Rhat = k								
                                 k_conv = k - best_W
                                 W_check = best_W  # immediately check MCSE
 
