@@ -234,10 +234,12 @@ class FASO(Optimizer):
         diagnostics = self._sgo._diagnostics
         k_conv = None # Iteration number when reached convergence
         k_stopped = None # Iteration number when MCSE/ESS conditions met
+        k_Rhat = None # Iteration number when R hat convergence criterion met
         learning_rate = self._sgo._learning_rate
         variational_param = init_param.copy()
         variational_param_history = []
         value_history = []
+        descent_dir_history = []
         ess_and_mcse_k_history = []
         ess_history = []
         mcse_history = []
@@ -259,6 +261,8 @@ class FASO(Optimizer):
                         descent_dir = self._sgo.descent_direction(object_grad)
                         variational_param -= learning_rate * descent_dir
                         variational_param_history.append(variational_param.copy())
+                        if diagnostics:
+                            descent_dir_history.append(descent_dir)
                     total_opt_time += opt_timer.interval
                     # If convergence has not been reached then check for
                     # convergence using R hat
@@ -273,6 +277,7 @@ class FASO(Optimizer):
                                 iterate_average_k_history.append(k)
                                 iterate_average_history.append(iterate_average)
                             if R_hat_success:
+                                k_Rhat = k								
                                 k_conv = k - best_W
                                 W_check = best_W  # immediately check MCSE
 
@@ -339,11 +344,13 @@ class FASO(Optimizer):
             print('Convergence reached at iteration', k_stopped)
         return dict(opt_param = iterate_average,
                     k_conv = k_conv,
+                    k_Rhat = k_Rhat,
                     k_stopped = k_stopped,
                     variational_param_history = np.array(variational_param_history),
                     value_history = np.array(value_history),
                     iterate_average_k_history = np.array(iterate_average_k_history),
                     iterate_average_history = np.array(iterate_average_history),
+                    descent_dir_history = np.array(descent_dir_history),
                     ess_and_mcse_k_history = np.array(ess_and_mcse_k_history),
                     ess_history = np.array(ess_history),
                     mcse_history = np.array(mcse_history)
