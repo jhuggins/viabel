@@ -8,6 +8,7 @@ from autograd.scipy.linalg import sqrtm
 from scipy.linalg import eigvalsh
 
 from paragami import (PatternDict,
+                      NumericArrayPattern,
                       NumericVectorPattern,
                       PSDSymmetricMatrixPattern,
                       FlattenFunctionInput)
@@ -19,6 +20,7 @@ __all__ = [
     'MFGaussian',
     'MFStudentT',
     'MultivariateT',
+    'NVPFlow'
 ]
 
 class ApproximationFamily(ABC):
@@ -372,3 +374,108 @@ class MultivariateT(ApproximationFamily):
     def df(self):
         """Degrees of freedom."""
         return self._df
+
+
+class NeuralNet(ApproximationFamily):
+    def __init__(self, layers_shapes, nonlinearity = np.tanh):
+        self._pattern = PatternDict(free_default = True)
+        self._layers = len(layers_shapes)
+        self._nonlinearity = nonlinearity
+        self.input_dim = layers_shapes[1][1]
+        for l in range(len(layers_shapes)):
+            self._pattern[str(l)] = NumericArrayPattern(shape = layers_shapes[l])
+
+    def forward(self, var_param, x):
+        for l in range(self._layers):
+            W = var_param[str(l)]
+            x = np.dot(x, W)
+            x = np.where(x < 0, 1e-2 * x, x)
+        return self._nonlinearity(x)
+
+    def sample(self, var_param, n_samples):
+        x = npr.multivariate_normal(mean = [0] * self.input_dim,
+                                    cov = np.identity(self.input_dim),
+                                    size = n_samples)
+        z = self.forward(x)
+        return z
+
+    def log_density(self, var_param, x):
+        pass
+
+    def mean_and_cov(self, var_param):
+        samples = self.sample(var_param, 200000)
+        return np.mean(samples), np.cov(samples)
+
+    def _pth_moment(self, var_param, p):
+        pass
+
+    def supports_pth_moment(self, p):
+        pass
+
+
+class NVPFlow(ApproximationFamily):
+    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,  seed = 1):
+        assert len(layers_t) == len(layers_s)
+        self.prior = prior
+        self.prior_param = prior_param
+        self._dim = dim
+        self._rs = npr.RandomState(seed)
+        self._supports_kl = False
+        self._supports_entropy = True
+        self.mask = mask
+        self._pattern = PatternDict(free_default = True)
+        self.t = [NeuralNet(layers_t, nonlinearity = lambda x: x)
+                  for _ in range(len(mask))]
+        self.s = [NeuralNet(layers_s) for _ in range(len(mask))]
+        for l in range(len(mask)):
+            self._pattern[str(l) + "t"] = self.t[l]._pattern
+            self._pattern[str(l) + "s"] = self.s[l]._pattern
+
+    def g(self, var_param, z):
+        x = z
+        param_dict = self._pattern.fold(var_param)
+        for i in range(len(self.t)):
+            x_ = x * self.mask[i]
+            s = self.s[i].forward(param_dict[str(i) + "s"], x_) * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], x_) * (1 - self.mask[i])
+            x = x_ + (1 - self.mask[i]) * (x * np.exp(s) + t)
+        return x
+
+    def f(self, var_param, x):
+        param_dict = self._pattern.fold(var_param)
+        log_det_J, z = np.zeros(x.shape[0]), x
+        for i in reversed(range(len(self.t))):
+            z_ = self.mask[i] * z
+            s = self.s[i].forward(param_dict[str(i) + "s"], z_) * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], z_) * (1 - self.mask[i])
+            z = (1 - self.mask[i]) * (z - t) * np.exp(-s) + z_
+            log_det_J -= s.sum(axis = 1)
+        return z, log_det_J
+
+    def log_density(self, var_param, x):
+        z, logp = self.f(var_param, x)
+        return self.prior.log_density(self.prior_param, z) + logp
+
+    def sample(self, var_param, n_samples, seed = 1):
+        self.n_samples = n_samples
+        z = self.prior.sample(self.prior_param, int(n_samples), seed = seed)
+        logp = self.prior.log_density(self.prior_param, z)
+        x = self.g(var_param, z)
+        return x
+
+    def entropy(self, var_param):
+        eps = self._rs.randn(int(self.n_samples), int(self._dim))
+        zs, ldet_sum = self.f(var_param, eps)
+        lls = mvn.logpdf(eps, mean=np.zeros(self._dim), cov=np.eye(self._dim)) - ldet_sum
+        ldet_mean = np.mean(ldet_sum)
+        return ldet_mean
+
+    def mean_and_cov(self, var_param):
+        samples = self.sample(var_param, 200000)
+        return np.mean(samples, axis = 0), np.cov(samples.T)
+
+    def _pth_moment(self, var_param, p):
+        pass
+
+    def supports_pth_moment(self, p):
+        pass
