@@ -112,3 +112,32 @@ def test_MultivariateT():
             var_param1 = np.random.randn(approx.var_param_dim)
             _test_family(approx, var_param0, var_param1, [2,4], entropy_offset)
     # TODO: check behavior in corner cases
+
+
+def test_NeuralNet():
+    np.random.seed(56)
+    df = 100
+    for dim in [1, 3]:
+        layers_shapes = [[dim, 10], [10, dim]]
+        approx = approximations.NeuralNet(layers_shapes)
+        for i in range(3):
+            var_param0 = np.random.randn(approx.var_param_dim)
+            var_param1 = np.random.randn(approx.var_param_dim)
+            _test_family(approx, var_param0, var_param1, [0])
+    # TODO: check behavior in corner cases
+
+
+def test_NVP():
+    np.random.seed(56)
+    df = 100
+    for dim in [1, 3]:
+        layers_shapes = [[dim, 10], [10, dim]]
+        prior = approximations.MFGaussian(dim)
+        prior_param = np.concatenate([[0] * dim, [1] * dim]])
+        approx = approximations.NVPFlow(layers_shapes, layers_shapes, prior,
+                                        prior_param, dim)
+        for i in range(3):
+            var_param0 = np.random.randn(approx.var_param_dim)
+            var_param1 = np.random.randn(approx.var_param_dim)
+            _test_family(approx, var_param0, var_param1, [0])
+    # TODO: check behavior in corner cases
