@@ -377,13 +377,17 @@ class MultivariateT(ApproximationFamily):
 
 
 class NeuralNet(ApproximationFamily):
-    def __init__(self, layers_shapes, nonlinearity = np.tanh):
+    def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000):
         self._pattern = PatternDict(free_default = True)
+        self.mc_samples = mc_samples
         self._layers = len(layers_shapes)
         self._nonlinearity = nonlinearity
         self.input_dim = layers_shapes[1][1]
         for l in range(len(layers_shapes)):
             self._pattern[str(l)] = NumericArrayPattern(shape = layers_shapes[l])
+
+        super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True),
+                         False, False)
 
     def forward(self, var_param, x):
         for l in range(self._layers):
@@ -400,24 +404,27 @@ class NeuralNet(ApproximationFamily):
         return z
 
     def log_density(self, var_param, x):
-        pass
+        log_prior = mvn.logpdf(self._pattern.flatten(var_param), 0, 1)
+        return log_prior
 
     def mean_and_cov(self, var_param):
-        samples = self.sample(var_param, 200000)
+        samples = self.sample(var_param, self.mc_samples)
         return np.mean(samples), np.cov(samples)
 
     def _pth_moment(self, var_param, p):
         pass
 
     def supports_pth_moment(self, p):
-        pass
+        return False
 
 
 class NVPFlow(ApproximationFamily):
-    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,  seed = 1):
+    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,
+                 seed=1, mc_samples=10000):
         assert len(layers_t) == len(layers_s)
         self.prior = prior
         self.prior_param = prior_param
+        self.mc_samples = mc_samples
         self._dim = dim
         self._rs = npr.RandomState(seed)
         self._supports_kl = False
@@ -430,6 +437,8 @@ class NVPFlow(ApproximationFamily):
         for l in range(len(mask)):
             self._pattern[str(l) + "t"] = self.t[l]._pattern
             self._pattern[str(l) + "s"] = self.s[l]._pattern
+
+        super().__init__(dim, self._pattern.flat_length(True), False, False)
 
     def g(self, var_param, z):
         x = z
@@ -471,11 +480,11 @@ class NVPFlow(ApproximationFamily):
         return ldet_mean
 
     def mean_and_cov(self, var_param):
-        samples = self.sample(var_param, 200000)
+        samples = self.sample(var_param, self.mc_samples)
         return np.mean(samples, axis = 0), np.cov(samples.T)
 
     def _pth_moment(self, var_param, p):
         pass
 
     def supports_pth_moment(self, p):
-        pass
+        return False
