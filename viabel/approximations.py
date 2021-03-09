@@ -4,6 +4,7 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.t as t_dist
+from autograd import jacobian
 from autograd.scipy.linalg import sqrtm
 from scipy.linalg import eigvalsh
 
@@ -400,12 +401,16 @@ class NeuralNet(ApproximationFamily):
         x = npr.multivariate_normal(mean = [0] * self.input_dim,
                                     cov = np.identity(self.input_dim),
                                     size = n_samples)
-        z = self.forward(x)
+        z = self.forward(var_param, x)
         return z
 
     def log_density(self, var_param, x):
-        log_prior = mvn.logpdf(self._pattern.flatten(var_param), 0, 1)
-        return log_prior
+        jac = jacobian(self.forward, 1)
+        j = jac(var_param, x).reshape(x.size, x.size)
+        log_det = np.sum(np.diagonal(j))
+        log_prior = np.sum(mvn.logpdf(self.forward(var_param, x),
+                                      np.zeros(x.shape[1]), np.eye(x.shape[1])))
+        return log_prior + log_det
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
