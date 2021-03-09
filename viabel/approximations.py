@@ -4,7 +4,7 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.t as t_dist
-from autograd import jacobian
+from autograd import jacobian, elementwise_grad
 from autograd.scipy.linalg import sqrtm
 from scipy.linalg import eigvalsh
 
@@ -401,11 +401,14 @@ class NeuralNet(ApproximationFamily):
                          False, False)
 
     def forward(self, var_param, x):
+        log_det_J = np.zeros(x.shape[0])
+        derivative = elementwise_grad(self._nonlinearity)
         for l in range(self._layers):
             W = var_param[str(l)]
             x = np.dot(x, W)
             x = np.where(x < 0, 1e-2 * x, x)
-        return self._nonlinearity(x)
+            log_det_J -= np.dot(derivative(x), W.T).sum(axis = 1)
+        return self._nonlinearity(x), log_det_J
 
     def sample(self, var_param, n_samples):
         x = npr.multivariate_normal(mean = [0] * self.input_dim,
@@ -415,12 +418,9 @@ class NeuralNet(ApproximationFamily):
         return z
 
     def log_density(self, var_param, x):
-        jac = jacobian(self.forward, 1)
-        j = jac(var_param, x).reshape(x.size, x.size)
-        log_det = np.sum(np.diagonal(j))
-        log_prior = np.sum(mvn.logpdf(self.forward(var_param, x),
-                                      np.zeros(x.shape[1]), np.eye(x.shape[1])))
-        return log_prior + log_det
+        z, log_det_J = self.forward(var_param, x)
+        log_prior = mvn.logpdf(z, np.zeros(x.shape[1]), np.eye(x.shape[1]))
+        return log_prior + log_det_J
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
@@ -490,8 +490,8 @@ class NVPFlow(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         for i in range(len(self.t)):
             x_ = x * self.mask[i]
-            s = self.s[i].forward(param_dict[str(i) + "s"], x_) * (1 - self.mask[i])
-            t = self.t[i].forward(param_dict[str(i) + "t"], x_) * (1 - self.mask[i])
+            s = self.s[i].forward(param_dict[str(i) + "s"], x_)[0] * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], x_)[0] * (1 - self.mask[i])
             x = x_ + (1 - self.mask[i]) * (x * np.exp(s) + t)
         return x
 
@@ -509,8 +509,8 @@ class NVPFlow(ApproximationFamily):
         log_det_J, z = np.zeros(x.shape[0]), x
         for i in reversed(range(len(self.t))):
             z_ = self.mask[i] * z
-            s = self.s[i].forward(param_dict[str(i) + "s"], z_) * (1 - self.mask[i])
-            t = self.t[i].forward(param_dict[str(i) + "t"], z_) * (1 - self.mask[i])
+            s = self.s[i].forward(param_dict[str(i) + "s"], z_)[0] * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], z_)[0] * (1 - self.mask[i])
             z = (1 - self.mask[i]) * (z - t) * np.exp(-s) + z_
             log_det_J -= s.sum(axis = 1)
         return z, log_det_J
