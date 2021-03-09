@@ -379,6 +379,16 @@ class MultivariateT(ApproximationFamily):
 
 class NeuralNet(ApproximationFamily):
     def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000):
+        """
+        Parameters
+        ----------
+        layers_shapes : `list of int`
+            The hidden layers dimensions.
+        nonlinearity : `function`
+            Non linear function to apply after each layer.
+        mc_samples : `int`
+            Number of samples to draw internally for computing mean and cov.
+        """
         self._pattern = PatternDict(free_default = True)
         self.mc_samples = mc_samples
         self._layers = len(layers_shapes)
@@ -426,6 +436,27 @@ class NeuralNet(ApproximationFamily):
 class NVPFlow(ApproximationFamily):
     def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,
                  seed=1, mc_samples=10000):
+        """
+        Parameters
+        ----------
+        layers_t : `list of int`
+            The hidden layers dimensions for the translation operator.
+        layers_s : `list of int`
+            The hidden layers dimensions for the scaling operator.
+        mask : `mask int`
+            Mask to apply to the entry of each operator.
+        prior : `ApproximationFamily`
+            Prior for the latent space Z.
+        prior_param : `numpy array`
+            Parameter vector for the prior, must follow the same format as any
+            variational family.
+        dim : `int`
+            Input dimension.
+        seed : `int`
+            Random seed for reproducibility.
+        mc_samples : `int`
+            Number of samples to draw internally for computing mean and cov.
+        """
         assert len(layers_t) == len(layers_s)
         self.prior = prior
         self.prior_param = prior_param
@@ -446,6 +477,15 @@ class NVPFlow(ApproximationFamily):
         super().__init__(dim, self._pattern.flat_length(True), False, False)
 
     def g(self, var_param, z):
+        """Inverse NVP flow.
+
+        Parameters
+        ----------
+        var_param : `numpy array`
+            Flat array of variational parameters.
+        z : `numpy array`
+            Latent space sample.
+        """
         x = z
         param_dict = self._pattern.fold(var_param)
         for i in range(len(self.t)):
@@ -456,6 +496,15 @@ class NVPFlow(ApproximationFamily):
         return x
 
     def f(self, var_param, x):
+        """Forward NVP flow.
+
+        Parameters
+        ----------
+        var_param : `numpy array`
+            Flat array of variational parameters.
+        x : `numpy array`
+            Original space data.
+        """
         param_dict = self._pattern.fold(var_param)
         log_det_J, z = np.zeros(x.shape[0]), x
         for i in reversed(range(len(self.t))):
