@@ -133,7 +133,7 @@ def test_NVP():
     for dim in [1, 3]:
         layers_shapes = [[dim, 10], [10, dim]]
         prior = approximations.MFGaussian(dim)
-        prior_param = np.concatenate([[0] * dim, [1] * dim]])
+        prior_param = np.concatenate([[0] * dim, [1] * dim])
         approx = approximations.NVPFlow(layers_shapes, layers_shapes, prior,
                                         prior_param, dim)
         for i in range(3):
