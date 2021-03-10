@@ -424,7 +424,7 @@ class NeuralNet(ApproximationFamily):
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
-        return np.mean(samples), np.cov(samples)
+        return np.mean(samples, axis = 0), np.cov(samples.T)
 
     def _pth_moment(self, var_param, p):
         pass
