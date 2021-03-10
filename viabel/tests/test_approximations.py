@@ -121,8 +121,8 @@ def test_NeuralNet():
         layers_shapes = [[dim, 10], [10, dim]]
         approx = approximations.NeuralNet(layers_shapes)
         for i in range(3):
-            var_param0 = np.random.randn(approx.var_param_dim)
-            var_param1 = np.random.randn(approx.var_param_dim)
+            var_param0 = approx._pattern.fold(np.random.randn(approx.var_param_dim))
+            var_param1 = approx._pattern.fold(np.random.randn(approx.var_param_dim))
             _test_family(approx, var_param0, var_param1, [0])
     # TODO: check behavior in corner cases
 
@@ -134,10 +134,15 @@ def test_NVP():
         layers_shapes = [[dim, 10], [10, dim]]
         prior = approximations.MFGaussian(dim)
         prior_param = np.concatenate([[0] * dim, [1] * dim])
-        approx = approximations.NVPFlow(layers_shapes, layers_shapes, prior,
-                                        prior_param, dim)
+        half = np.floor(dim / 2).astype(int)
+        halfplus = np.ceil(dim / 2).astype(int)
+        m1 = np.hstack([[0] * half, [1] * halfplus])
+        m2 = np.hstack([[1] * half, [0] * halfplus])
+        mask = np.array(list(np.vstack([m1, m2])) * 3)
+        approx = approximations.NVPFlow(layers_shapes, layers_shapes, mask,
+                                        prior, prior_param, dim)
         for i in range(3):
-            var_param0 = np.random.randn(approx.var_param_dim)
-            var_param1 = np.random.randn(approx.var_param_dim)
+            var_param0 = approx._pattern.fold(np.random.randn(approx.var_param_dim))
+            var_param1 = approx._pattern.fold(np.random.randn(approx.var_param_dim))
             _test_family(approx, var_param0, var_param1, [0])
     # TODO: check behavior in corner cases

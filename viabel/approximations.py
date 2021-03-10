@@ -414,7 +414,7 @@ class NeuralNet(ApproximationFamily):
         x = npr.multivariate_normal(mean = [0] * self.input_dim,
                                     cov = np.identity(self.input_dim),
                                     size = n_samples)
-        z = self.forward(var_param, x)
+        z, _ = self.forward(var_param, x)
         return z
 
     def log_density(self, var_param, x):
