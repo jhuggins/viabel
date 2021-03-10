@@ -378,7 +378,7 @@ class MultivariateT(ApproximationFamily):
 
 
 class NeuralNet(ApproximationFamily):
-    def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000):
+    def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000, seed = 1):
         """
         Parameters
         ----------
@@ -388,17 +388,20 @@ class NeuralNet(ApproximationFamily):
             Non linear function to apply after each layer.
         mc_samples : `int`
             Number of samples to draw internally for computing mean and cov.
+        seed : `int`
+            Internal seed representation.
         """
         self._pattern = PatternDict(free_default = True)
         self.mc_samples = mc_samples
         self._layers = len(layers_shapes)
         self._nonlinearity = nonlinearity
+        self._rs = npr.RandomState(seed)
         self.input_dim = layers_shapes[1][1]
         for l in range(len(layers_shapes)):
             self._pattern[str(l)] = NumericArrayPattern(shape = layers_shapes[l])
 
         super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True),
-                         False, False)
+                         True, False)
 
     def forward(self, var_param, x):
         log_det_J = np.zeros(x.shape[0])
@@ -406,25 +409,29 @@ class NeuralNet(ApproximationFamily):
         for l in range(self._layers):
             W = var_param[str(l)]
             x = np.dot(x, W)
-            x = np.where(x < 0, 1e-2 * x, x)
-            log_det_J -= np.dot(derivative(x), W.T).sum(axis = 1)
+            log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis = 1)))
         return self._nonlinearity(x), log_det_J
 
     def sample(self, var_param, n_samples):
-        x = npr.multivariate_normal(mean = [0] * self.input_dim,
-                                    cov = np.identity(self.input_dim),
-                                    size = n_samples)
-        z, _ = self.forward(var_param, x)
-        return z
+        z_0 = npr.multivariate_normal(mean = [0] * self.input_dim,
+                                      cov = np.identity(self.input_dim),
+                                      size = n_samples)
+        z_k, _ = self.forward(var_param, z_0)
+        return z_k
 
     def log_density(self, var_param, x):
         z, log_det_J = self.forward(var_param, x)
-        log_prior = mvn.logpdf(z, np.zeros(x.shape[1]), np.eye(x.shape[1]))
-        return log_prior + log_det_J
+        log_prior = mvn.logpdf(x, np.zeros(x.shape[1]), np.eye(x.shape[1]))
+        return log_prior - log_det_J
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
         return np.mean(samples, axis = 0), np.cov(samples.T)
+
+    def entropy(self, var_param):
+        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
+        z, _ = self.forward(var_param, z_0)
+        return -np.mean(self.log_density(var_param, z))
 
     def _pth_moment(self, var_param, p):
         pass
@@ -463,8 +470,6 @@ class NVPFlow(ApproximationFamily):
         self.mc_samples = mc_samples
         self._dim = dim
         self._rs = npr.RandomState(seed)
-        self._supports_kl = False
-        self._supports_entropy = True
         self.mask = mask
         self._pattern = PatternDict(free_default = True)
         self.t = [NeuralNet(layers_t, nonlinearity = lambda x: x)
@@ -474,7 +479,7 @@ class NVPFlow(ApproximationFamily):
             self._pattern[str(l) + "t"] = self.t[l]._pattern
             self._pattern[str(l) + "s"] = self.s[l]._pattern
 
-        super().__init__(dim, self._pattern.flat_length(True), False, False)
+        super().__init__(dim, self._pattern.flat_length(True), True, False)
 
     def g(self, var_param, z):
         """Inverse NVP flow.
@@ -517,21 +522,18 @@ class NVPFlow(ApproximationFamily):
 
     def log_density(self, var_param, x):
         z, logp = self.f(var_param, x)
-        return self.prior.log_density(self.prior_param, z) + logp
+        return self.prior.log_density(self.prior_param, x) + logp
 
     def sample(self, var_param, n_samples, seed = 1):
-        self.n_samples = n_samples
-        z = self.prior.sample(self.prior_param, int(n_samples), seed = seed)
-        logp = self.prior.log_density(self.prior_param, z)
-        x = self.g(var_param, z)
-        return x
+        z_0 = self.prior.sample(self.prior_param, int(n_samples), seed = seed)
+        z_k = self.g(var_param, z_0)
+        return z_k
 
     def entropy(self, var_param):
-        eps = self._rs.randn(int(self.n_samples), int(self._dim))
-        zs, ldet_sum = self.f(var_param, eps)
-        lls = mvn.logpdf(eps, mean=np.zeros(self._dim), cov=np.eye(self._dim)) - ldet_sum
-        ldet_mean = np.mean(ldet_sum)
-        return ldet_mean
+        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
+        zs, ldet = self.f(var_param, z_0)
+        lls = self.prior.log_density(self.prior_param, z_0) + ldet
+        return -np.mean(lls)
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
