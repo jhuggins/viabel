@@ -4,10 +4,12 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.t as t_dist
+from autograd import jacobian, elementwise_grad
 from autograd.scipy.linalg import sqrtm
 from scipy.linalg import eigvalsh
 
 from paragami import (PatternDict,
+                      NumericArrayPattern,
                       NumericVectorPattern,
                       PSDSymmetricMatrixPattern,
                       FlattenFunctionInput)
@@ -19,6 +21,7 @@ __all__ = [
     'MFGaussian',
     'MFStudentT',
     'MultivariateT',
+    'NVPFlow'
 ]
 
 class ApproximationFamily(ABC):
@@ -372,3 +375,172 @@ class MultivariateT(ApproximationFamily):
     def df(self):
         """Degrees of freedom."""
         return self._df
+
+
+class NeuralNet(ApproximationFamily):
+    def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000, seed = 1):
+        """
+        Parameters
+        ----------
+        layers_shapes : `list of int`
+            The hidden layers dimensions.
+        nonlinearity : `function`
+            Non linear function to apply after each layer.
+        mc_samples : `int`
+            Number of samples to draw internally for computing mean and cov.
+        seed : `int`
+            Internal seed representation.
+        """
+        self._pattern = PatternDict(free_default = True)
+        self.mc_samples = mc_samples
+        self._layers = len(layers_shapes)
+        self._nonlinearity = nonlinearity
+        self._rs = npr.RandomState(seed)
+        self.input_dim = layers_shapes[1][1]
+        for l in range(len(layers_shapes)):
+            self._pattern[str(l)] = NumericArrayPattern(shape = layers_shapes[l])
+
+        super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True),
+                         True, False)
+
+    def forward(self, var_param, x):
+        log_det_J = np.zeros(x.shape[0])
+        derivative = elementwise_grad(self._nonlinearity)
+        for l in range(self._layers):
+            W = var_param[str(l)]
+            x = np.dot(x, W)
+            log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis = 1)))
+        return self._nonlinearity(x), log_det_J
+
+    def sample(self, var_param, n_samples):
+        z_0 = npr.multivariate_normal(mean = [0] * self.input_dim,
+                                      cov = np.identity(self.input_dim),
+                                      size = n_samples)
+        z_k, _ = self.forward(var_param, z_0)
+        return z_k
+
+    def log_density(self, var_param, x):
+        z, log_det_J = self.forward(var_param, x)
+        log_prior = mvn.logpdf(x, np.zeros(x.shape[1]), np.eye(x.shape[1]))
+        return log_prior - log_det_J
+
+    def mean_and_cov(self, var_param):
+        samples = self.sample(var_param, self.mc_samples)
+        return np.mean(samples, axis = 0), np.cov(samples.T)
+
+    def entropy(self, var_param):
+        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
+        z, _ = self.forward(var_param, z_0)
+        return -np.mean(self.log_density(var_param, z))
+
+    def _pth_moment(self, var_param, p):
+        pass
+
+    def supports_pth_moment(self, p):
+        return False
+
+
+class NVPFlow(ApproximationFamily):
+    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,
+                 seed=1, mc_samples=10000):
+        """
+        Parameters
+        ----------
+        layers_t : `list of int`
+            The hidden layers dimensions for the translation operator.
+        layers_s : `list of int`
+            The hidden layers dimensions for the scaling operator.
+        mask : `mask int`
+            Mask to apply to the entry of each operator.
+        prior : `ApproximationFamily`
+            Prior for the latent space Z.
+        prior_param : `numpy array`
+            Parameter vector for the prior, must follow the same format as any
+            variational family.
+        dim : `int`
+            Input dimension.
+        seed : `int`
+            Random seed for reproducibility.
+        mc_samples : `int`
+            Number of samples to draw internally for computing mean and cov.
+        """
+        assert len(layers_t) == len(layers_s)
+        self.prior = prior
+        self.prior_param = prior_param
+        self.mc_samples = mc_samples
+        self._dim = dim
+        self._rs = npr.RandomState(seed)
+        self.mask = mask
+        self._pattern = PatternDict(free_default = True)
+        self.t = [NeuralNet(layers_t, nonlinearity = lambda x: x)
+                  for _ in range(len(mask))]
+        self.s = [NeuralNet(layers_s) for _ in range(len(mask))]
+        for l in range(len(mask)):
+            self._pattern[str(l) + "t"] = self.t[l]._pattern
+            self._pattern[str(l) + "s"] = self.s[l]._pattern
+
+        super().__init__(dim, self._pattern.flat_length(True), True, False)
+
+    def g(self, var_param, z):
+        """Inverse NVP flow.
+
+        Parameters
+        ----------
+        var_param : `numpy array`
+            Flat array of variational parameters.
+        z : `numpy array`
+            Latent space sample.
+        """
+        x = z
+        param_dict = self._pattern.fold(var_param)
+        for i in range(len(self.t)):
+            x_ = x * self.mask[i]
+            s = self.s[i].forward(param_dict[str(i) + "s"], x_)[0] * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], x_)[0] * (1 - self.mask[i])
+            x = x_ + (1 - self.mask[i]) * (x * np.exp(s) + t)
+        return x
+
+    def f(self, var_param, x):
+        """Forward NVP flow.
+
+        Parameters
+        ----------
+        var_param : `numpy array`
+            Flat array of variational parameters.
+        x : `numpy array`
+            Original space data.
+        """
+        param_dict = self._pattern.fold(var_param)
+        log_det_J, z = np.zeros(x.shape[0]), x
+        for i in reversed(range(len(self.t))):
+            z_ = self.mask[i] * z
+            s = self.s[i].forward(param_dict[str(i) + "s"], z_)[0] * (1 - self.mask[i])
+            t = self.t[i].forward(param_dict[str(i) + "t"], z_)[0] * (1 - self.mask[i])
+            z = (1 - self.mask[i]) * (z - t) * np.exp(-s) + z_
+            log_det_J -= s.sum(axis = 1)
+        return z, log_det_J
+
+    def log_density(self, var_param, x):
+        z, logp = self.f(var_param, x)
+        return self.prior.log_density(self.prior_param, x) + logp
+
+    def sample(self, var_param, n_samples, seed = 1):
+        z_0 = self.prior.sample(self.prior_param, int(n_samples), seed = seed)
+        z_k = self.g(var_param, z_0)
+        return z_k
+
+    def entropy(self, var_param):
+        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
+        zs, ldet = self.f(var_param, z_0)
+        lls = self.prior.log_density(self.prior_param, z_0) + ldet
+        return -np.mean(lls)
+
+    def mean_and_cov(self, var_param):
+        samples = self.sample(var_param, self.mc_samples)
+        return np.mean(samples, axis = 0), np.cov(samples.T)
+
+    def _pth_moment(self, var_param, p):
+        pass
+
+    def supports_pth_moment(self, p):
+        return False

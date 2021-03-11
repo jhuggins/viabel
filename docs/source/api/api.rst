@@ -22,6 +22,8 @@ Approximation Families
    MFGaussian
    MFStudentT
    MultivariateT
+   NeuralNet
+   NVPFlow
 
 Models
 ------
