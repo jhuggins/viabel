@@ -82,6 +82,8 @@ class StochasticGradientOptimizer(Optimizer):
                     object_val, object_grad = objective(variational_param)
                     descent_dir = self.descent_direction(object_grad)
                     variational_param -= self._learning_rate * descent_dir
+                    if len(variational_param.shape) == 2:
+                        variational_param *= 0.9999
                     # record state information
                     value_history.append(object_val)
                     if self._diagnostics or iap is not None:
@@ -277,7 +279,7 @@ class FASO(Optimizer):
                                 iterate_average_k_history.append(k)
                                 iterate_average_history.append(iterate_average)
                             if R_hat_success:
-                                k_Rhat = k								
+                                k_Rhat = k
                                 k_conv = k - best_W
                                 W_check = best_W  # immediately check MCSE
 
