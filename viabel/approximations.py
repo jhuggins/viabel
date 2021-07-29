@@ -6,6 +6,7 @@ import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.t as t_dist
 from autograd import jacobian, elementwise_grad
 from autograd.scipy.linalg import sqrtm
+from autograd.scipy.special import expit
 from scipy.linalg import eigvalsh
 
 from paragami import (PatternDict,
@@ -378,14 +379,17 @@ class MultivariateT(ApproximationFamily):
 
 
 class NeuralNet(ApproximationFamily):
-    def __init__(self, layers_shapes, nonlinearity = np.tanh, mc_samples = 10000, seed = 1):
+    def __init__(self, layers_shapes, nonlinearity = np.tanh, last = np.tanh,
+                 mc_samples = 10000, seed = 1):
         """
         Parameters
         ----------
         layers_shapes : `list of int`
             The hidden layers dimensions.
         nonlinearity : `function`
-            Non linear function to apply after each layer.
+            Non linear function to apply after each layer except the last layer.
+        last : `function`
+            Non linear function to apply after the last layer.
         mc_samples : `int`
             Number of samples to draw internally for computing mean and cov.
         seed : `int`
@@ -395,10 +399,12 @@ class NeuralNet(ApproximationFamily):
         self.mc_samples = mc_samples
         self._layers = len(layers_shapes)
         self._nonlinearity = nonlinearity
+        self._last = last
         self._rs = npr.RandomState(seed)
-        self.input_dim = layers_shapes[1][1]
+        self.input_dim = layers_shapes[0][1]
         for l in range(len(layers_shapes)):
             self._pattern[str(l)] = NumericArrayPattern(shape = layers_shapes[l])
+            self._pattern[str(l)+"_b"] = NumericArrayPattern(shape = [layers_shapes[l][1]])
 
         super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True),
                          True, False)
@@ -406,11 +412,17 @@ class NeuralNet(ApproximationFamily):
     def forward(self, var_param, x):
         log_det_J = np.zeros(x.shape[0])
         derivative = elementwise_grad(self._nonlinearity)
-        for l in range(self._layers):
+        derivative_last = elementwise_grad(self._last)
+        for lid, l in enumerate(range(self._layers)):
             W = var_param[str(l)]
-            x = np.dot(x, W)
-            log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis = 1)))
-        return self._nonlinearity(x), log_det_J
+            b = var_param[str(l)+"_b"]
+            if lid + 1 == self._layers:
+                x = self._last(np.dot(x, W) + b)
+                log_det_J += np.log(np.abs(np.dot(derivative_last(x), W.T).sum(axis = 1)))
+            else:
+                x = self._nonlinearity(np.dot(x, W) + b)
+                log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis = 1)))
+        return x, log_det_J
 
     def sample(self, var_param, n_samples):
         z_0 = npr.multivariate_normal(mean = [0] * self.input_dim,
@@ -441,7 +453,7 @@ class NeuralNet(ApproximationFamily):
 
 
 class NVPFlow(ApproximationFamily):
-    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim,
+    def __init__(self, layers_t, layers_s, mask, prior, prior_param, dim, activation=np.tanh,
                  seed=1, mc_samples=10000):
         """
         Parameters
@@ -472,14 +484,13 @@ class NVPFlow(ApproximationFamily):
         self._rs = npr.RandomState(seed)
         self.mask = mask
         self._pattern = PatternDict(free_default = True)
-        self.t = [NeuralNet(layers_t, nonlinearity = lambda x: x)
-                  for _ in range(len(mask))]
-        self.s = [NeuralNet(layers_s) for _ in range(len(mask))]
+        self.t = [NeuralNet(layers_t, nonlinearity=activation, last=lambda x: x) for _ in range(len(mask))]
+        self.s = [NeuralNet(layers_s, nonlinearity=activation, last=np.tanh) for _ in range(len(mask))]
         for l in range(len(mask)):
             self._pattern[str(l) + "t"] = self.t[l]._pattern
             self._pattern[str(l) + "s"] = self.s[l]._pattern
 
-        super().__init__(dim, self._pattern.flat_length(True), True, False)
+        super().__init__(dim, self._pattern.flat_length(True), False, False)
 
     def g(self, var_param, z):
         """Inverse NVP flow.
@@ -522,18 +533,12 @@ class NVPFlow(ApproximationFamily):
 
     def log_density(self, var_param, x):
         z, logp = self.f(var_param, x)
-        return self.prior.log_density(self.prior_param, x) + logp
+        return self.prior.log_density(self.prior_param, z) + logp
 
-    def sample(self, var_param, n_samples, seed = 1):
+    def sample(self, var_param, n_samples, seed = None):
         z_0 = self.prior.sample(self.prior_param, int(n_samples), seed = seed)
         z_k = self.g(var_param, z_0)
         return z_k
-
-    def entropy(self, var_param):
-        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
-        zs, ldet = self.f(var_param, z_0)
-        lls = self.prior.log_density(self.prior_param, z_0) + ldet
-        return -np.mean(lls)
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
