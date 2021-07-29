@@ -45,12 +45,14 @@ class Optimizer(ABC):
 class StochasticGradientOptimizer(Optimizer):
     """Stochastic gradient descent.
     """
-    def __init__(self, learning_rate, *, iterate_avg_prop=0.2, diagnostics=False):
+    def __init__(self, learning_rate, *, weight_decay=0, iterate_avg_prop=0.2, diagnostics=False):
         """
         Parameters
         -----------
         learning_rate : `float`
             Tuning parameter that determines the step size
+        weight_decay: `float`
+            L2 regularization weight
         iterate_avg_prop : `float`
             Proportion of iterates to use for computing iterate average. `None`
             means no iterate averaging. The default is 0.2.
@@ -58,6 +60,7 @@ class StochasticGradientOptimizer(Optimizer):
             Record diagnostic information if `True`. The default is `False`.
         """
         self._learning_rate = learning_rate
+        self._weight_decay = weight_decay
         if iterate_avg_prop is not None and (iterate_avg_prop > 1.0 or
                                              iterate_avg_prop <= 0.0):
             raise ValueError('"iterate_avg_prop" must be None or between 0 and 1')
@@ -82,8 +85,8 @@ class StochasticGradientOptimizer(Optimizer):
                     object_val, object_grad = objective(variational_param)
                     descent_dir = self.descent_direction(object_grad)
                     variational_param -= self._learning_rate * descent_dir
-                    if len(variational_param.shape) == 2:
-                        variational_param *= 0.9999
+                    if variational_param.ndim == 2:
+                        variational_param *= (1 - self._weight_decay)
                     # record state information
                     value_history.append(object_val)
                     if self._diagnostics or iap is not None:
@@ -138,11 +141,11 @@ class StochasticGradientOptimizer(Optimizer):
 class RMSProp(StochasticGradientOptimizer):
     """RMSProp optimization method
     """
-    def __init__(self, learning_rate, *, beta=0.9, jitter=1e-8,
+    def __init__(self, learning_rate, *, weight_decay=0, beta=0.9, jitter=1e-8,
                  diagnostics=False):
         self._beta = beta
         self._jitter = jitter
-        super().__init__(learning_rate, diagnostics=diagnostics)
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
         self._avg_grad_sq = None
@@ -162,11 +165,11 @@ class RMSProp(StochasticGradientOptimizer):
 class WindowedAdaGrad(StochasticGradientOptimizer):
     """Adam optimization method
     """
-    def __init__(self, learning_rate, *, window_size=10, jitter=1e-8,
+    def __init__(self, learning_rate, *, weight_decay=0, window_size=10, jitter=1e-8,
                  diagnostics=False):
         self._window_size = window_size
         self._jitter = jitter
-        super().__init__(learning_rate, diagnostics=diagnostics)
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
         self._history = []
@@ -183,9 +186,9 @@ class WindowedAdaGrad(StochasticGradientOptimizer):
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
-    def __init__(self, learning_rate, *, jitter=1e-8, diagnostics=False):
+    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
         self._jitter = jitter
-        super().__init__(learning_rate, diagnostics=diagnostics)
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
         self._sum_grad_sq = 0
