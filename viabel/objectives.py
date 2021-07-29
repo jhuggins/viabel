@@ -10,6 +10,7 @@ __all__ = [
     'VariationalObjective',
     'StochasticVariationalObjective',
     'ExclusiveKL',
+    'DISInclusiveKL',
     'AlphaDivergence'
 ]
 
@@ -128,6 +129,42 @@ class ExclusiveKL(StochasticVariationalObjective):
             else:
                 lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
             return -lower_bound
+        self._objective_and_grad = value_and_grad(variational_objective)
+
+
+class DISInclusiveKL(StochasticVariationalObjective):
+    """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
+    def __init__(self, approx, model, num_mc_samples, use_path_deriv=False, w_clip_threshold=10):
+            """
+            Parameters
+            ----------
+            approx : `ApproximationFamily` object
+            model : `Model` object
+            num_mc_sample : `int`
+                Number of Monte Carlo samples to use to approximate the objective.
+            use_path_deriv : `bool`
+                Use path derivative (for "sticking the landing") gradient estimator
+            """
+            self._use_path_deriv = use_path_deriv
+            self._w_clip_threshold = w_clip_threshold
+            super().__init__(approx, model, num_mc_samples)
+
+    def _update_objective_and_grad(self):
+        approx = self.approx
+        def variational_objective(var_param):
+            samples = approx.sample(var_param, self.num_mc_samples)
+            if self._use_path_deriv:
+                var_param_stopped = getval(var_param)
+                log_density_q = approx.log_density(var_param_stopped, samples)
+            else:
+                log_density_q = approx.log_density(samples)
+
+            log_density_p_unnormalized = self.model(samples)
+            log_w = log_density_p_unnormalized - log_density_q
+            w_clipped = np.exp(log_w).clip(0, self._w_clip_threshold)
+            obj = np.inner(w_clipped, log_density_q) / self.num_mc_samples
+            return obj
+
         self._objective_and_grad = value_and_grad(variational_objective)
 
 
