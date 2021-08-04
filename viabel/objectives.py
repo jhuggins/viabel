@@ -134,36 +134,132 @@ class ExclusiveKL(StochasticVariationalObjective):
 
 class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
-    def __init__(self, approx, model, num_mc_samples, use_path_deriv=False, w_clip_threshold=10):
+    def __init__(self, approx, model, num_mc_samples, ess_target,
+                 temper_prior, temper_prior_params, use_resampling=True,
+                 w_clip_threshold=10):
             """
             Parameters
             ----------
             approx : `ApproximationFamily` object
             model : `Model` object
             num_mc_sample : `int`
-                Number of Monte Carlo samples to use to approximate the objective.
-            use_path_deriv : `bool`
-                Use path derivative (for "sticking the landing") gradient estimator
+                Number of Monte Carlo samples to use to approximate the KL divergence.
+                (N in the paper)
+            ess_target: `int`
+                The ess target to adjust epsilon (M in the paper). It is also the number of
+                samples in resampling.
+            temper_prior: `Model` object
+                A prior distribution to temper the model. Typically multivariate normal.
+            temper_prior_params: `numpy.ndarray` object
+                Parameters for the temper prior. Typically mean 0 and variance 1.
+            use_resampling: `bool`
+                Whether to use resampling.
+            w_clip_threshold: `float`
+                The maximum weight.
             """
-            self._use_path_deriv = use_path_deriv
+            self._ess_target = ess_target
             self._w_clip_threshold = w_clip_threshold
+            self._max_bisection_its = 50
+            self._max_eps = self._eps = 1
+            self._use_resampling = use_resampling
+            self._tempered_model_log_pdf = lambda eps, samples, log_p_unnormalized: (
+                eps * temper_prior.log_density(temper_prior_params, samples)
+                + (1 - eps) * log_p_unnormalized)
             super().__init__(approx, model, num_mc_samples)
+
+
+    def _get_weights(self, eps, samples, log_p_unnormalized, log_q):
+       """Calculates normalised importance sampling weights"""
+       logw = self._tempered_model_log_pdf(eps, samples, log_p_unnormalized) - log_q
+       max_logw = np.max(logw)
+       if max_logw == -np.inf:
+           raise ValueError('All weights zero! ' \
+              + 'Suggests overflow in importance density.')
+
+       w = np.exp(logw)
+       return w
+
+    def _get_ess(self, w):
+        """Calculates effective sample size of normalised importance sampling weights"""
+        ess = (np.sum(w) ** 2.0) / np.sum(w ** 2.0)
+        return ess
+
+    def _get_eps_and_weights(self, eps_guess, samples, log_p_unnormalized, log_q):
+        """Find new epsilon value
+
+        Uses bisection to find epsilon < eps_guess giving required ESS. If none exists, returns eps_guess.
+
+        Returns new epsilon value and corresponding ESS and normalised importance sampling weights.
+        """
+
+        lower = 0.
+        upper = eps_guess
+        eps_guess = (lower + upper) / 2.
+        for i in range(self._max_bisection_its):
+            w = self._get_weights(eps_guess, samples, log_p_unnormalized, log_q)
+            ess = self._get_ess(w)
+            if ess > self._ess_target:
+                upper = eps_guess
+            else:
+                lower = eps_guess
+            eps_guess = (lower + upper) / 2.
+
+        w = self._get_weights(eps_guess, samples, log_p_unnormalized, log_q)
+        ess = self._get_ess(w)
+
+        # Consider returning extreme epsilon values if they are still endpoints
+        if lower == 0.:
+            eps_guess = 0.
+        if upper == self._max_eps:
+            eps_guess = self._max_eps
+
+        return eps_guess, ess, w
+
+
+    def _clip_weights(self, w):
+        """Clip weights to `self._w_clip_threshold`
+        Other weights are scaled up proportionately to keep sum equal to 1"""
+        S = np.sum(w)
+        if not any(w > S * self._w_clip_threshold):
+            return w
+
+        to_clip = (w >= S*self._w_clip_threshold) #nb clip those equal to max_weight
+                                           #so we don't push them over it!
+        n_to_clip = np.sum(to_clip)
+        to_not_clip = np.logical_not(to_clip)
+        sum_unclipped = np.sum(w[to_not_clip])
+        if sum_unclipped == 0:
+            # Impossible to clip further!
+            return w
+        w[to_clip] = self._w_clip_threshold * sum_unclipped \
+                     / (1. - self._w_clip_threshold * n_to_clip)
+        return self._clip_weights(w)
+
 
     def _update_objective_and_grad(self):
         approx = self.approx
         def variational_objective(var_param):
-            samples = approx.sample(var_param, self.num_mc_samples)
-            if self._use_path_deriv:
-                var_param_stopped = getval(var_param)
-                log_density_q = approx.log_density(var_param_stopped, samples)
-            else:
-                log_density_q = approx.log_density(samples)
+            samples = getval(approx.sample(var_param, self.num_mc_samples))
+            log_q = approx.log_density(var_param, samples)
+            log_p_unnormalized = self.model(samples)
 
-            log_density_p_unnormalized = self.model(samples)
-            log_w = log_density_p_unnormalized - log_density_q
-            w_clipped = np.exp(log_w).clip(0, self._w_clip_threshold)
-            obj = np.inner(w_clipped, log_density_q) / self.num_mc_samples
-            return obj
+            self._eps, ess, w = self._get_eps_and_weights(self._eps, samples, log_p_unnormalized, log_q)
+            w_clipped = self._clip_weights(w)
+
+            if not self._use_resampling:
+                return -np.inner(getval(w_clipped), log_q) / self.num_mc_samples
+            else:
+                w_sum = np.sum(w_clipped)
+                w_normalized = w_clipped / w_sum
+                indices = np.random.choice(self.num_mc_samples,
+                                           size=self._ess_target, p=getval(w_normalized))
+                indices, counts = np.unique(indices, return_counts=True)
+
+                obj = 0
+                for id, cc in zip(indices, counts):
+                    obj += -getval(cc) * getval(w_sum) * log_q[id]
+
+                return obj / self._ess_target / self.num_mc_samples
 
         self._objective_and_grad = value_and_grad(variational_objective)
 
