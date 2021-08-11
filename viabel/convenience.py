@@ -1,10 +1,9 @@
-import numpy as np
+from viabel._psis import psislw
 from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
 from viabel.optimization import FASO, RMSProp
-from viabel._psis import psislw
 
 all = [
     'bbvi',
@@ -58,13 +57,15 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
     """
     if objective is not None:
         if fit is not None or log_density is not None or approx is not None:
-            raise ValueError('if objective is specified, cannot specify fit, log_density, or approx')
+            raise ValueError(
+                'if objective is specified, cannot specify fit, log_density, or approx')
         approx = objective.approx
         model = objective.model
     else:
         if log_density is None:
             if fit is None:
-                raise ValueError('either log_density or fit must be specified if objective not given')
+                raise ValueError(
+                    'either log_density or fit must be specified if objective not given')
             model = StanModel(fit)
         elif fit is None:
             model = Model(log_density)
@@ -138,7 +139,8 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
     print()
     # if k-hat looks good, check other diagnostics
     if approx.supports_pth_moment(2) and approx.supports_pth_moment(4):
-        moment_bound_fn = lambda p: approx.pth_moment(var_param, p)
+        def moment_bound_fn(p):
+            return approx.pth_moment(var_param, p)
     else:
         moment_bound_fn = None
     _, q_var = approx.mean_and_cov(var_param)
@@ -147,7 +149,7 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
                                    moment_bound_fn=moment_bound_fn,
                                    q_var=q_var))
     print('The 2-divergence is estimated to be d2 = {:.2g}'.format(results['d2']))
-    if results['d2'] > 4.6: # pragma: no cover
+    if results['d2'] > 4.6:  # pragma: no cover
         print('WARNING: d2 > 4.6 means the approximation is very inaccurate')
     elif results['d2'] > 0.1:
         print('WARNING: 0.1 < d2 < 4.6 means the approximation is somewhat '

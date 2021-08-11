@@ -1,10 +1,11 @@
 import os
-import shutil
 import pickle
+import shutil
 import time
-import pystan
 from hashlib import md5
+
 import autograd.numpy as np
+import pystan
 
 
 def vectorize_if_needed(f, a, axis=-1):
@@ -18,16 +19,18 @@ def ensure_2d(a):
     if a.ndim == 0:
         return a
     while a.ndim < 2:
-        a = a[:,np.newaxis]
+        a = a[:, np.newaxis]
     return a
 
 
 class Timer:
     def __init__(self):
         pass
+
     def __enter__(self):
         self.start = time.perf_counter()
         return self
+
     def __exit__(self, *args):
         self.end = time.perf_counter()
         self.interval = self.end - self.start
@@ -43,7 +46,7 @@ def _stan_model_cache_dir():
 
 
 def clear_stan_model_cache():
-    stan_model_dir =_stan_model_cache_dir()
+    stan_model_dir = _stan_model_cache_dir()
     if os.path.exists(stan_model_dir):
         shutil.rmtree(stan_model_dir)
 
@@ -58,7 +61,7 @@ def StanModel_cache(model_code=None, model_name=None, **kwargs):
             raise ValueError('invalid model "{}"'.format(model_name))
         with open(model_file) as f:
             model_code = f.read()
-    stan_model_dir =_stan_model_cache_dir()
+    stan_model_dir = _stan_model_cache_dir()
     os.makedirs(stan_model_dir, exist_ok=True)
     code_hash = md5(model_code.encode('ascii')).hexdigest()
     if model_name is None:

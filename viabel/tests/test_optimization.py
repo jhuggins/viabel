@@ -1,12 +1,10 @@
-from viabel.optimization import (StochasticGradientOptimizer, FASO, RMSProp,
-                                 AdaGrad, WindowedAdaGrad)
-from viabel.objectives import VariationalObjective
-
 import autograd.numpy as anp
 import numpy as np
+import pytest
 from autograd import grad
 
-import pytest
+from viabel.optimization import (
+    FASO, AdaGrad, RMSProp, StochasticGradientOptimizer, WindowedAdaGrad)
 
 
 class DummyApproximationFamily:
@@ -14,19 +12,20 @@ class DummyApproximationFamily:
         self.supports_kl = True
 
     def kl(self, param1, param2):
-        return np.mean((param1-param2)**2)
+        return np.mean((param1 - param2)**2)
 
 
 class DummyObjective:
     """Simple quadratic dummy objective with artifical Gaussian gradient noise"""
+
     def __init__(self, target, noise=1, scales=1):
         self._noise = noise
-        self.objective_fun = lambda x: .5*anp.sum(((x-target)/scales)**2)
+        self.objective_fun = lambda x: .5 * anp.sum(((x - target) / scales)**2)
         self.grad_objective_fun = grad(self.objective_fun)
         self.approx = DummyApproximationFamily()
 
     def __call__(self, x):
-        noisy_grad = self.grad_objective_fun(x) + self._noise*np.random.randn(x.size)
+        noisy_grad = self.grad_objective_fun(x) + self._noise * np.random.randn(x.size)
         return self.objective_fun(x), noisy_grad
 
 

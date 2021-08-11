@@ -1,18 +1,18 @@
-from viabel import convenience
-from viabel import Model, MFGaussian
-
 import autograd.numpy as anp
 import numpy as np
+import pytest
 from autograd.scipy.stats import norm
 
-import pytest
+from viabel import Model, convenience
 
 
 def test_bbvi():
     np.random.seed(851)
-    mean = np.array([3.,-4.])[np.newaxis,:]
-    stdev = np.array([2.,5.])[np.newaxis,:]
-    log_p = lambda x: anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+    mean = np.array([3., -4.])[np.newaxis, :]
+    stdev = np.array([2., 5.])[np.newaxis, :]
+
+    def log_p(x):
+        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     # use large number of MC samples to ensure accuracy
     for adaptive in [True, False]:
         results = convenience.bbvi(2, log_density=log_p, num_mc_samples=50,
@@ -35,14 +35,17 @@ def test_bbvi():
 
 def test_vi_diagnostics():
     np.random.seed(153)
-    log_p = lambda x: anp.sum(norm.logpdf(x), axis=1)
+
+    def log_p(x):
+        return anp.sum(norm.logpdf(x), axis=1)
     results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100)
     diagnostics = convenience.vi_diagnostics(results['opt_param'],
                                              objective=results['objective'])
     assert diagnostics['khat'] < .1
     assert diagnostics['d2'] < 0.1
 
-    log_p2 = lambda x: anp.sum(norm.logpdf(x, scale=3), axis=1)
+    def log_p2(x):
+        return anp.sum(norm.logpdf(x, scale=3), axis=1)
     model2 = Model(log_p2)
     diagnostics2 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
@@ -50,7 +53,8 @@ def test_vi_diagnostics():
     assert diagnostics2['khat'] > 0.7
     assert 'd2' not in diagnostics2
 
-    log_p3 = lambda x: anp.sum(norm.logpdf(x, scale=.5), axis=1)
+    def log_p3(x):
+        return anp.sum(norm.logpdf(x, scale=.5), axis=1)
     model3 = Model(log_p3)
     diagnostics3 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,

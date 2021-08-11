@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 
-from autograd import value_and_grad, vector_jacobian_product
-from autograd.core import getval
-
 import autograd.numpy as np
 import autograd.numpy.random as npr
+from autograd import value_and_grad, vector_jacobian_product
+from autograd.core import getval
 
 __all__ = [
     'VariationalObjective',
@@ -17,6 +16,7 @@ __all__ = [
 
 class VariationalObjective(ABC):
     """A class representing a variational objective to minimize"""
+
     def __init__(self, approx, model):
         """
         Parameters
@@ -28,7 +28,6 @@ class VariationalObjective(ABC):
         self._model = model
         self._objective_and_grad = None
         self._update_objective_and_grad()
-
 
     def __call__(self, var_param):
         """Evaluate objective and its gradient.
@@ -50,7 +49,6 @@ class VariationalObjective(ABC):
 
         Should be called whenever a parameter that the objective depends on
         (e.g., `approx` or `model`) is updated."""
-        pass
 
     @property
     def approx(self):
@@ -75,6 +73,7 @@ class VariationalObjective(ABC):
 
 class StochasticVariationalObjective(VariationalObjective):
     """A class representing a variational objective approximated using Monte Carlo."""
+
     def __init__(self, approx, model, num_mc_samples):
         """
         Parameters
@@ -103,27 +102,30 @@ class ExclusiveKL(StochasticVariationalObjective):
 
     Equivalent to using the canonical evidence lower bound (ELBO)
     """
+
     def __init__(self, approx, model, num_mc_samples, use_path_deriv=False):
-            """
-            Parameters
-            ----------
-            approx : `ApproximationFamily` object
-            model : `Model` object
-            num_mc_sample : `int`
-                Number of Monte Carlo samples to use to approximate the objective.
-            use_path_deriv : `bool`
-                Use path derivative (for "sticking the landing") gradient estimator
-            """
-            self._use_path_deriv = use_path_deriv
-            super().__init__(approx, model, num_mc_samples)
+        """
+        Parameters
+        ----------
+        approx : `ApproximationFamily` object
+        model : `Model` object
+        num_mc_sample : `int`
+            Number of Monte Carlo samples to use to approximate the objective.
+        use_path_deriv : `bool`
+            Use path derivative (for "sticking the landing") gradient estimator
+        """
+        self._use_path_deriv = use_path_deriv
+        super().__init__(approx, model, num_mc_samples)
 
     def _update_objective_and_grad(self):
         approx = self.approx
+
         def variational_objective(var_param):
             samples = approx.sample(var_param, self.num_mc_samples)
             if self._use_path_deriv:
                 var_param_stopped = getval(var_param)
-                lower_bound = np.mean(self.model(samples) - approx.log_density(var_param_stopped, samples))
+                lower_bound = np.mean(
+                    self.model(samples) - approx.log_density(var_param_stopped, samples))
             elif approx.supports_entropy:
                 lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
             else:
@@ -134,50 +136,50 @@ class ExclusiveKL(StochasticVariationalObjective):
 
 class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
+
     def __init__(self, approx, model, num_mc_samples, ess_target,
                  temper_prior, temper_prior_params, use_resampling=True,
                  w_clip_threshold=10):
-            """
-            Parameters
-            ----------
-            approx : `ApproximationFamily` object
-            model : `Model` object
-            num_mc_sample : `int`
-                Number of Monte Carlo samples to use to approximate the KL divergence.
-                (N in the paper)
-            ess_target: `int`
-                The ess target to adjust epsilon (M in the paper). It is also the number of
-                samples in resampling.
-            temper_prior: `Model` object
-                A prior distribution to temper the model. Typically multivariate normal.
-            temper_prior_params: `numpy.ndarray` object
-                Parameters for the temper prior. Typically mean 0 and variance 1.
-            use_resampling: `bool`
-                Whether to use resampling.
-            w_clip_threshold: `float`
-                The maximum weight.
-            """
-            self._ess_target = ess_target
-            self._w_clip_threshold = w_clip_threshold
-            self._max_bisection_its = 50
-            self._max_eps = self._eps = 1
-            self._use_resampling = use_resampling
-            self._tempered_model_log_pdf = lambda eps, samples, log_p_unnormalized: (
-                eps * temper_prior.log_density(temper_prior_params, samples)
-                + (1 - eps) * log_p_unnormalized)
-            super().__init__(approx, model, num_mc_samples)
-
+        """
+        Parameters
+        ----------
+        approx : `ApproximationFamily` object
+        model : `Model` object
+        num_mc_sample : `int`
+            Number of Monte Carlo samples to use to approximate the KL divergence.
+            (N in the paper)
+        ess_target: `int`
+            The ess target to adjust epsilon (M in the paper). It is also the number of
+            samples in resampling.
+        temper_prior: `Model` object
+            A prior distribution to temper the model. Typically multivariate normal.
+        temper_prior_params: `numpy.ndarray` object
+            Parameters for the temper prior. Typically mean 0 and variance 1.
+        use_resampling: `bool`
+            Whether to use resampling.
+        w_clip_threshold: `float`
+            The maximum weight.
+        """
+        self._ess_target = ess_target
+        self._w_clip_threshold = w_clip_threshold
+        self._max_bisection_its = 50
+        self._max_eps = self._eps = 1
+        self._use_resampling = use_resampling
+        self._tempered_model_log_pdf = lambda eps, samples, log_p_unnormalized: (
+            eps * temper_prior.log_density(temper_prior_params, samples)
+            + (1 - eps) * log_p_unnormalized)
+        super().__init__(approx, model, num_mc_samples)
 
     def _get_weights(self, eps, samples, log_p_unnormalized, log_q):
-       """Calculates normalised importance sampling weights"""
-       logw = self._tempered_model_log_pdf(eps, samples, log_p_unnormalized) - log_q
-       max_logw = np.max(logw)
-       if max_logw == -np.inf:
-           raise ValueError('All weights zero! ' \
-              + 'Suggests overflow in importance density.')
+        """Calculates normalised importance sampling weights"""
+        logw = self._tempered_model_log_pdf(eps, samples, log_p_unnormalized) - log_q
+        max_logw = np.max(logw)
+        if max_logw == -np.inf:
+            raise ValueError('All weights zero! '
+                             + 'Suggests overflow in importance density.')
 
-       w = np.exp(logw)
-       return w
+        w = np.exp(logw)
+        return w
 
     def _get_ess(self, w):
         """Calculates effective sample size of normalised importance sampling weights"""
@@ -187,7 +189,8 @@ class DISInclusiveKL(StochasticVariationalObjective):
     def _get_eps_and_weights(self, eps_guess, samples, log_p_unnormalized, log_q):
         """Find new epsilon value
 
-        Uses bisection to find epsilon < eps_guess giving required ESS. If none exists, returns eps_guess.
+        Uses bisection to find epsilon < eps_guess giving required ESS.
+        If none exists, returns eps_guess.
 
         Returns new epsilon value and corresponding ESS and normalised importance sampling weights.
         """
@@ -215,7 +218,6 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
         return eps_guess, ess, w
 
-
     def _clip_weights(self, w):
         """Clip weights to `self._w_clip_threshold`
         Other weights are scaled up proportionately to keep sum equal to 1"""
@@ -223,8 +225,8 @@ class DISInclusiveKL(StochasticVariationalObjective):
         if not any(w > S * self._w_clip_threshold):
             return w
 
-        to_clip = (w >= S*self._w_clip_threshold) #nb clip those equal to max_weight
-                                           #so we don't push them over it!
+        to_clip = (w >= S * self._w_clip_threshold)  # nb clip those equal to max_weight
+        # so we don't push them over it!
         n_to_clip = np.sum(to_clip)
         to_not_clip = np.logical_not(to_clip)
         sum_unclipped = np.sum(w[to_not_clip])
@@ -232,18 +234,19 @@ class DISInclusiveKL(StochasticVariationalObjective):
             # Impossible to clip further!
             return w
         w[to_clip] = self._w_clip_threshold * sum_unclipped \
-                     / (1. - self._w_clip_threshold * n_to_clip)
+            / (1. - self._w_clip_threshold * n_to_clip)
         return self._clip_weights(w)
-
 
     def _update_objective_and_grad(self):
         approx = self.approx
+
         def variational_objective(var_param):
             samples = getval(approx.sample(var_param, self.num_mc_samples))
             log_q = approx.log_density(var_param, samples)
             log_p_unnormalized = self.model(samples)
 
-            self._eps, ess, w = self._get_eps_and_weights(self._eps, samples, log_p_unnormalized, log_q)
+            self._eps, ess, w = self._get_eps_and_weights(
+                self._eps, samples, log_p_unnormalized, log_q)
             w_clipped = self._clip_weights(w)
 
             if not self._use_resampling:
@@ -266,6 +269,7 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
 class AlphaDivergence(StochasticVariationalObjective):
     """Log of the alpha-divergence."""
+
     def __init__(self, approx, model, num_mc_samples, alpha):
         """
         Parameters
@@ -294,14 +298,15 @@ class AlphaDivergence(StochasticVariationalObjective):
         log_weights_vjp = vector_jacobian_product(compute_log_weights)
         alpha = self.alpha
         # manually compute objective and gradient
+
         def objective_grad_and_log_norm(var_param):
             # must create a shared seed!
             seed = npr.randint(2**32)
             log_weights = compute_log_weights(var_param, seed)
             log_norm = np.max(log_weights)
             scaled_values = np.exp(log_weights - log_norm)**alpha
-            obj_value = np.log(np.mean(scaled_values))/alpha + log_norm
-            obj_grad = alpha*log_weights_vjp(var_param, seed, scaled_values) / scaled_values.size
+            obj_value = np.log(np.mean(scaled_values)) / alpha + log_norm
+            obj_grad = alpha * log_weights_vjp(var_param, seed, scaled_values) / scaled_values.size
             return (obj_value, obj_grad)
 
         self._objective_and_grad = objective_grad_and_log_norm

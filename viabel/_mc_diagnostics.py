@@ -1,38 +1,40 @@
+import warnings
+
 import autograd.numpy as np
 from scipy.fftpack import next_fast_len
-import warnings
 
 
 def autocov(samples, axis=-1):
-        """Compute autocovariance estimates for every lag for the input array.
-        Parameters
-        ----------
-        samples : `numpy.ndarray(n_chains, n_iters)`
-            An array containing samples
-        Returns
-        -------
-        acov: `numpy.ndarray`
-            Autocovariance of samples that has same size as the input array
-        """
-        axis = axis if axis > 0 else len(samples.shape) + axis
-        n = samples.shape[axis]
-        m = next_fast_len(2 * n)
+    """Compute autocovariance estimates for every lag for the input array.
+    Parameters
+    ----------
+    samples : `numpy.ndarray(n_chains, n_iters)`
+        An array containing samples
+    Returns
+    -------
+    acov: `numpy.ndarray`
+        Autocovariance of samples that has same size as the input array
+    """
+    axis = axis if axis > 0 else len(samples.shape) + axis
+    n = samples.shape[axis]
+    m = next_fast_len(2 * n)
 
-        samples = samples - samples.mean(axis, keepdims=True)
+    samples = samples - samples.mean(axis, keepdims=True)
 
-        # added to silence tuple warning for a submodule
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+    # added to silence tuple warning for a submodule
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
 
-            ifft_samp = np.fft.rfft(samples, n=m, axis=axis)
-            ifft_samp *= np.conjugate(ifft_samp)
+        ifft_samp = np.fft.rfft(samples, n=m, axis=axis)
+        ifft_samp *= np.conjugate(ifft_samp)
 
-            shape = tuple(
-                slice(None) if dim_len != axis else slice(0, n) for dim_len, _ in enumerate(samples.shape)
-            )
-            cov = np.fft.irfft(ifft_samp, n=m, axis=axis)[shape]
-            cov /= n
-            return cov
+        shape = tuple(
+            slice(None) if dim_len != axis else slice(0, n)
+            for dim_len, _ in enumerate(samples.shape)
+        )
+        cov = np.fft.irfft(ifft_samp, n=m, axis=axis)[shape]
+        cov /= n
+        return cov
 
 
 def ess(samples):
@@ -54,11 +56,11 @@ def ess(samples):
     if (n_chain > 1):
         ValueError("Number of chains must be 1")
     acov = autocov(samples, axis=1)
-    #chain_mean = samples.mean(axis=1)
+    # chain_mean = samples.mean(axis=1)
     mean_var = np.mean(acov[:, 0]) * n_draw / (n_draw - 1.0)
     var_plus = mean_var * (n_draw - 1.0) / n_draw
-    #if n_chain > 1:
-     #   var_plus += _numba_var(svar, np.var, chain_mean, axis=None, ddof=1)
+    # if n_chain > 1:
+    #   var_plus += _numba_var(svar, np.var, chain_mean, axis=None, ddof=1)
 
     rho_hat_t = np.zeros(n_draw)
     rho_hat_even = 1.0
@@ -89,7 +91,7 @@ def ess(samples):
         t += 2
 
     ess = n_chain * n_draw
-    tau_hat = -1.0 + 2.0 * np.sum(rho_hat_t[: max_t + 1]) + np.sum(rho_hat_t[max_t + 1 : max_t + 2])
+    tau_hat = -1.0 + 2.0 * np.sum(rho_hat_t[: max_t + 1]) + np.sum(rho_hat_t[max_t + 1: max_t + 2])
     tau_hat = max(tau_hat, 1 / np.log10(ess))
     ess = ess / tau_hat
     if np.isnan(rho_hat_t).any():
@@ -113,9 +115,9 @@ def MCSE(sample):
 
     """
     n_iters, d = sample.shape
-    sd_dev = np.sqrt(np.var(sample,ddof=1,axis=0))
-    eff_samp = [ess(sample[:,i].reshape(1,n_iters)) for i in range(d)]
-    mcse = sd_dev/np.sqrt(eff_samp)
+    sd_dev = np.sqrt(np.var(sample, ddof=1, axis=0))
+    eff_samp = [ess(sample[:, i].reshape(1, n_iters)) for i in range(d)]
+    mcse = sd_dev / np.sqrt(eff_samp)
     return eff_samp, mcse
 
 
@@ -139,21 +141,21 @@ def compute_R_hat(chains, warmup=0, jitter=1e-8):
 
     """
     n_chains = 1
-    chains = chains[warmup:,:]
+    chains = chains[warmup:, :]
     n_iters, d = chains.shape
-    if n_iters%2 ==1:
-        n_iters = int(n_iters-1)
-        chains = chains[:n_iters,:]
+    if n_iters % 2 == 1:
+        n_iters = int(n_iters - 1)
+        chains = chains[:n_iters, :]
     n_iters = n_iters // 2
-    n_chains2 = n_chains *2
-    psi = np.reshape(chains,(n_chains2,n_iters,d))
-    psi_dot_j = np.mean(psi,axis=1)
-    psi_dot_dot = np.mean(psi_dot_j,axis=0)
+    n_chains2 = n_chains * 2
+    psi = np.reshape(chains, (n_chains2, n_iters, d))
+    psi_dot_j = np.mean(psi, axis=1)
+    psi_dot_dot = np.mean(psi_dot_j, axis=0)
     s_j_2 = np.sum((psi - np.expand_dims(psi_dot_j, axis=1)) ** 2, axis=1) / (n_iters - 1)
     B = n_iters * np.sum((psi_dot_j - psi_dot_dot) ** 2, axis=0) / (n_chains2 - 1)
     W = np.nanmean(s_j_2, axis=0)
     W = W + jitter
-    var_hat = (n_iters - 1) / n_iters + (B / (n_iters*W))
+    var_hat = (n_iters - 1) / n_iters + (B / (n_iters * W))
     R_hat = np.sqrt(var_hat)
     return R_hat
 
@@ -176,7 +178,7 @@ def R_hat_convergence_check(samples, windows, Rhat_threshold=1.1):
     best_W: `int`
         Best window size
     """
-    R_hat_array = [np.max(compute_R_hat(np.array(samples[-window:]),0)) for window in windows]
+    R_hat_array = [np.max(compute_R_hat(np.array(samples[-window:]), 0)) for window in windows]
     best_R_hat_ind = np.argmin(R_hat_array)
     success = R_hat_array[best_R_hat_ind] <= Rhat_threshold
     return success, windows[best_R_hat_ind]

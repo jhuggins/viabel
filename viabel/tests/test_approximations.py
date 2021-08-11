@@ -1,10 +1,8 @@
-from viabel import approximations
-
 import numpy as np
+import pytest
 from scipy import stats
 
-import pytest
-
+from viabel import approximations
 
 MC_SAMPLES = 1000000
 test_size = 0.0001
@@ -21,7 +19,8 @@ def _test_entropy(approx, var_param, entropy_offset):
 def _test_kl(approx, var_param0, var_param1):
     kl = approx.kl(var_param0, var_param1)
     samples = approx.sample(var_param0, MC_SAMPLES)
-    log_prob_diffs = approx.log_density(var_param0, samples) - approx.log_density(var_param1, samples)
+    log_prob_diffs = approx.log_density(var_param0, samples) - \
+        approx.log_density(var_param1, samples)
 
     p_value = stats.ttest_1samp(log_prob_diffs, kl)[1]
     assert p_value > test_size
@@ -49,23 +48,24 @@ def _test_pth_moment(approx, var_param, p):
     sample_norms = np.linalg.norm(samples - sample_mean, axis=1, ord=2)
 
     p_value = stats.ttest_1samp(sample_norms**p, pth_moment)[1]
-    assert p_value > test_size, "expected: {}, estimated: {}".format(pth_moment, np.mean(sample_norms**p))
+    assert p_value > test_size, "expected: {}, estimated: {}".format(
+        pth_moment, np.mean(sample_norms**p))
 
 
 def _test_family(approx, var_param0, var_param1, should_support=[], entropy_offset=0):
     # These tests check that the variational family is defined self-consistently
     if approx.supports_entropy:
         _test_entropy(approx, var_param0, entropy_offset)
-    else: # pragma: no cover
+    else:  # pragma: no cover
         with pytest.raises(NotImplementedError):
             approx.entropy(var_param0)
     if approx.supports_kl:
         _test_kl(approx, var_param0, var_param1)
-    else: # pragma: no cover
+    else:  # pragma: no cover
         with pytest.raises(NotImplementedError):
             approx.kl(var_param0, var_param1)
     _test_mean_and_cov(approx, var_param0)
-    for p in set([1, 2,4]) | set(should_support):
+    for p in set([1, 2, 4]) | set(should_support):
         if p in should_support:
             assert approx.supports_pth_moment(p)
         if approx.supports_pth_moment(p):
@@ -82,7 +82,7 @@ def test_MFGaussian():
         for i in range(3):
             var_param0 = np.random.randn(approx.var_param_dim)
             var_param1 = np.random.randn(approx.var_param_dim)
-            _test_family(approx, var_param0, var_param1, [2,4])
+            _test_family(approx, var_param0, var_param1, [2, 4])
     # TODO: check behavior in corner cases
 
 
@@ -96,7 +96,7 @@ def test_MFStudentT():
         for i in range(3):
             var_param0 = np.random.randn(approx.var_param_dim)
             var_param1 = np.random.randn(approx.var_param_dim)
-            _test_family(approx, var_param0, var_param1, [2,4], entropy_offset)
+            _test_family(approx, var_param0, var_param1, [2, 4], entropy_offset)
     # TODO: check behavior in corner cases
 
 
@@ -110,7 +110,7 @@ def test_MultivariateT():
         for i in range(3):
             var_param0 = np.random.randn(approx.var_param_dim)
             var_param1 = np.random.randn(approx.var_param_dim)
-            _test_family(approx, var_param0, var_param1, [2,4], entropy_offset)
+            _test_family(approx, var_param0, var_param1, [2, 4], entropy_offset)
     # TODO: check behavior in corner cases
 
 
@@ -118,7 +118,7 @@ def test_NeuralNet():
     np.random.seed(56)
     for dim in [1, 3]:
         layers_shapes = [[dim, 10], [10, dim]]
-        approx = approximations.NeuralNet(layers_shapes, mc_samples = 1000000)
+        approx = approximations.NeuralNet(layers_shapes, mc_samples=1000000)
         for i in range(3):
             var_param0 = approx._pattern.fold(np.random.randn(approx.var_param_dim) / 10)
             var_param1 = approx._pattern.fold(np.random.randn(approx.var_param_dim) / 10)
@@ -138,7 +138,7 @@ def test_NVP():
         m2 = np.hstack([[1] * half, [0] * halfplus])
         mask = np.array(list(np.vstack([m1, m2])) * 3)
         approx = approximations.NVPFlow(layers_shapes, layers_shapes, mask,
-                                        prior, prior_param, dim, mc_samples = 1000000)
+                                        prior, prior_param, dim, mc_samples=1000000)
         for i in range(3):
             var_param0 = np.random.randn(approx.var_param_dim) / 100
             var_param1 = np.random.randn(approx.var_param_dim) / 100

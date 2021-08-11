@@ -1,19 +1,21 @@
-from viabel.approximations import MFStudentT
-from viabel.optimization import RMSProp
-from viabel.objectives import ExclusiveKL, AlphaDivergence
-
 import autograd.numpy as anp
 import numpy as np
 from autograd.scipy.stats import norm
+
+from viabel.approximations import MFStudentT
+from viabel.objectives import AlphaDivergence, ExclusiveKL
+from viabel.optimization import RMSProp
 
 
 def _test_objective(objective_cls, num_mc_samples, **kwargs):
     np.random.seed(851)
     # mean = np.random.randn(1,dimension)
     # stdev = np.exp(np.random.randn(1,dimension))
-    mean = np.array([1.,-1.])[np.newaxis,:]
-    stdev = np.array([2.,5.])[np.newaxis,:]
-    log_p = lambda x: anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+    mean = np.array([1., -1.])[np.newaxis, :]
+    stdev = np.array([2., 5.])[np.newaxis, :]
+
+    def log_p(x):
+        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     approx = MFStudentT(2, 100)
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
@@ -29,7 +31,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
 
 
 def test_ExclusiveKL():
-     _test_objective(ExclusiveKL, 100)
+    _test_objective(ExclusiveKL, 100)
 
 
 def test_ExclusiveKL_path_deriv():
