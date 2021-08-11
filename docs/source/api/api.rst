@@ -44,6 +44,7 @@ Variational Objectives
 
    VariationalObjective
    ExclusiveKL
+   DISInclusiveKL
    AlphaDivergence
 
 Diagnostics
