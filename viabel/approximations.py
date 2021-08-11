@@ -17,6 +17,7 @@ __all__ = [
     'MFGaussian',
     'MFStudentT',
     'MultivariateT',
+    'NeuralNet',
     'NVPFlow'
 ]
 
@@ -400,23 +401,25 @@ class NeuralNet(ApproximationFamily):
         self._nonlinearity = nonlinearity
         self._last = last
         self._rs = npr.RandomState(seed)
-        self.input_dim = layers_shapes[0][1]
+        self.input_dim = layers_shapes[0][0]
         for layer_id in range(len(layers_shapes)):
             self._pattern[str(layer_id)] = NumericArrayPattern(shape=layers_shapes[layer_id])
             self._pattern[str(layer_id) + "_b"] = NumericArrayPattern(
                 shape=[layers_shapes[layer_id][1]])
 
-        super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True),
-                         True, False)
+        super().__init__(layers_shapes[-1][-1], self._pattern.flat_length(True), False, False)
 
     def forward(self, var_param, x):
         log_det_J = np.zeros(x.shape[0])
         derivative = elementwise_grad(self._nonlinearity)
         derivative_last = elementwise_grad(self._last)
-        for lid, l in enumerate(range(self._layers)):
-            W = var_param[str(l)]
-            b = var_param[str(l) + "_b"]
-            if lid + 1 == self._layers:
+        print("X", x.shape)
+        for layer_id in range(self._layers):
+            W = var_param[str(layer_id)]
+            b = var_param[str(layer_id) + "_b"]
+            print(W.shape)
+            print(b.shape)
+            if layer_id + 1 == self._layers:
                 x = self._last(np.dot(x, W) + b)
                 log_det_J += np.log(np.abs(np.dot(derivative_last(x), W.T).sum(axis=1)))
             else:
@@ -432,21 +435,14 @@ class NeuralNet(ApproximationFamily):
         return z_k
 
     def log_density(self, var_param, x):
-        z, log_det_J = self.forward(var_param, x)
-        log_prior = mvn.logpdf(x, np.zeros(x.shape[1]), np.eye(x.shape[1]))
-        return log_prior - log_det_J
+        raise NotImplementedError
 
     def mean_and_cov(self, var_param):
         samples = self.sample(var_param, self.mc_samples)
         return np.mean(samples, axis=0), np.cov(samples.T)
 
-    def entropy(self, var_param):
-        z_0 = self._rs.randn(int(self.mc_samples), int(self._dim))
-        z, _ = self.forward(var_param, z_0)
-        return -np.mean(self.log_density(var_param, z))
-
     def _pth_moment(self, var_param, p):
-        pass
+        raise NotImplementedError
 
     def supports_pth_moment(self, p):
         return False
@@ -547,7 +543,7 @@ class NVPFlow(ApproximationFamily):
         return np.mean(samples, axis=0), np.cov(samples.T)
 
     def _pth_moment(self, var_param, p):
-        pass
+        raise NotImplementedError
 
     def supports_pth_moment(self, p):
         return False

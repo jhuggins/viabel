@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 from autograd.scipy.stats import norm
 
-from viabel import Model, convenience
+from viabel import convenience
+from viabel.models import Model
 
 
 def test_bbvi():
