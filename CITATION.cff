@@ -1,25 +1,10 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
-- family-names: "H. Huggins"
-  given-names: "Jonathan"
+- family-names: "Huggins"
+  given-names: "Jonathan H."
   orcid: "https://orcid.org/0000-0002-9256-6727"
 title: "VIABEL: Variational Inference and Approximation Bounds that are Efficient and Lightweight"
 version: 0.4.2
 date-released: 2021-02-06
 url: "https://github.com/jhuggins/viabel"
-preferred-citation:
-  type: article
-  authors:
-  - family-names: "H. Huggins"
-    given-names: "Jonathan"
-    orcid: "https://orcid.org/0000-0002-9256-6727"
-  - family-names: "Kasprzak"
-    given-names: "Mikołaj"
-  - family-names: "Campbell"
-    given-names: "Trevor"
-  - family-names: "Broderick"
-    given-names: "Tamara"
-  journal: "Proc. of the 23rd International Conference on Artificial Intelligence and Statistics"
-  title: "Validated Variational Inference via Practical Posterior Error Bounds"
-  year: 2020
