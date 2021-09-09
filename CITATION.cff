@@ -9,7 +9,7 @@ version: 0.4.2
 date-released: 2021-02-06
 url: "https://github.com/jhuggins/viabel"
 preferred-citation:
-  type: journal
+  type: article
   authors:
   - family-names: "H. Huggins"
     given-names: "Jonathan"
