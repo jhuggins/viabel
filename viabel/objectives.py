@@ -139,7 +139,7 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
     def __init__(self, approx, model, num_mc_samples, ess_target,
                  temper_prior, temper_prior_params, use_resampling=True,
-                 w_clip_threshold=10):
+                 num_resampling_batches=1, w_clip_threshold=10):
         """
         Parameters
         ----------
@@ -157,6 +157,8 @@ class DISInclusiveKL(StochasticVariationalObjective):
             Parameters for the temper prior. Typically mean 0 and variance 1.
         use_resampling: `bool`
             Whether to use resampling.
+        num_resampling_batches: `int`
+            Number of resampling batches. The resampling batch is `max(1, ess_target / num_resampling_batches)`.
         w_clip_threshold: `float`
             The maximum weight.
         """
@@ -165,6 +167,10 @@ class DISInclusiveKL(StochasticVariationalObjective):
         self._max_bisection_its = 50
         self._max_eps = self._eps = 1
         self._use_resampling = use_resampling
+        self._num_resampling_batches = num_resampling_batches
+        self._resampling_batch_size = max(1, self._ess_target // num_resampling_batches)
+        self._objective_step = 0
+
         self._tempered_model_log_pdf = lambda eps, samples, log_p_unnormalized: (
             eps * temper_prior.log_density(temper_prior_params, samples)
             + (1 - eps) * log_p_unnormalized)
@@ -241,28 +247,29 @@ class DISInclusiveKL(StochasticVariationalObjective):
         approx = self.approx
 
         def variational_objective(var_param):
-            samples = getval(approx.sample(var_param, self.num_mc_samples))
-            log_q = approx.log_density(var_param, samples)
-            log_p_unnormalized = self.model(samples)
+            if not self._use_resampling or self._objective_step % self._num_resampling_batches == 0:
+                self._state_samples = getval(approx.sample(var_param, self.num_mc_samples))
+                self._state_log_q = approx.log_density(var_param, self._state_samples)
+                self._state_log_p_unnormalized = self.model(self._state_samples)
 
-            self._eps, ess, w = self._get_eps_and_weights(
-                self._eps, samples, log_p_unnormalized, log_q)
-            w_clipped = self._clip_weights(w)
+                self._eps, ess, w = self._get_eps_and_weights(
+                    self._eps, self._state_samples, self._state_log_p_unnormalized, self._state_log_q)
+                self._state_w_clipped = self._clip_weights(w)
+                self._state_w_sum = np.sum(self._state_w_clipped)
+                self._state_w_normalized = self._state_w_clipped / self._state_w_sum
+
+            self._objective_step += 1
 
             if not self._use_resampling:
-                return -np.inner(getval(w_clipped), log_q) / self.num_mc_samples
+                return -np.inner(getval(self._state_w_clipped), self._state_log_q) / self.num_mc_samples
             else:
-                w_sum = np.sum(w_clipped)
-                w_normalized = w_clipped / w_sum
                 indices = np.random.choice(self.num_mc_samples,
-                                           size=self._ess_target, p=getval(w_normalized))
-                indices, counts = np.unique(indices, return_counts=True)
+                                           size=self._resampling_batch_size, p=getval(self._state_w_normalized))
+                samples_resampled = self._state_samples[indices]
 
-                obj = 0
-                for id, cc in zip(indices, counts):
-                    obj += -getval(cc) * getval(w_sum) * log_q[id]
+                obj = np.mean(-approx.log_density(var_param, getval(samples_resampled)))
 
-                return obj / self._ess_target / self.num_mc_samples
+                return obj * getval(self._state_w_sum) / self.num_mc_samples
 
         self._objective_and_grad = value_and_grad(variational_objective)
 

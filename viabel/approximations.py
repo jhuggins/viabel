@@ -413,12 +413,9 @@ class NeuralNet(ApproximationFamily):
         log_det_J = np.zeros(x.shape[0])
         derivative = elementwise_grad(self._nonlinearity)
         derivative_last = elementwise_grad(self._last)
-        print("X", x.shape)
         for layer_id in range(self._layers):
             W = var_param[str(layer_id)]
             b = var_param[str(layer_id) + "_b"]
-            print(W.shape)
-            print(b.shape)
             if layer_id + 1 == self._layers:
                 x = self._last(np.dot(x, W) + b)
                 log_det_J += np.log(np.abs(np.dot(derivative_last(x), W.T).sum(axis=1)))
