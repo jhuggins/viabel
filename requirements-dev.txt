@@ -6,3 +6,8 @@ codecov
 coverage
 pytest
 pystan
+
+# lint
+autoflake
+flake8
+isort

@@ -32,7 +32,8 @@ smoothed importance sampling. https://arxiv.org/abs/arXiv:1507.02646v5
 
 """
 
-from __future__ import division # For Python 2 compatibility
+from __future__ import division  # For Python 2 compatibility
+
 import numpy as np
 
 # 3-Clause BSD License
@@ -156,8 +157,8 @@ def psislw(lw, Reff=1.0, overwrite_lw=False):
     # precalculate constants
     cutoff_ind = - int(np.ceil(min(0.2 * n, 3 * np.sqrt(n / Reff)))) - 1
     cutoffmin = np.log(np.finfo(float).tiny)
-    logn = np.log(n)
-    k_min = 1/3
+    np.log(n)
+    k_min = 1 / 3
 
     # loop over sets of log weights
     for i, x in enumerate(lw_out.T if lw_out.ndim == 2 else lw_out[None, :]):
@@ -229,8 +230,8 @@ def gpdfitnew(x, sort=True, sort_in_place=False, return_quadrature=False):
         in-place (False by default).
 
     return_quadrature : bool, optional
-        If True, quadrature points and weight `ks` and `w` of the marginal posterior distribution of k are also calculated and returned. False by
-        default.
+        If True, quadrature points and weight `ks` and `w` of the marginal posterior distribution
+        of k are also calculated and returned. False by default.
 
     Returns
     -------
@@ -273,14 +274,14 @@ def gpdfitnew(x, sort=True, sort_in_place=False, return_quadrature=False):
     np.sqrt(bs, out=bs)
     np.subtract(1, bs, out=bs)
     if xsorted:
-        bs /= PRIOR * x[int(n/4 + 0.5) - 1]
+        bs /= PRIOR * x[int(n / 4 + 0.5) - 1]
         bs += 1 / x[-1]
     else:
-        bs /= PRIOR * x[sort[int(n/4 + 0.5) - 1]]
+        bs /= PRIOR * x[sort[int(n / 4 + 0.5) - 1]]
         bs += 1 / x[sort[-1]]
 
     ks = np.negative(bs)
-    temp = ks[:,None] * x
+    temp = ks[:, None] * x
     np.log1p(temp, out=temp)
     np.mean(temp, axis=1, out=ks)
 
@@ -291,7 +292,7 @@ def gpdfitnew(x, sort=True, sort_in_place=False, return_quadrature=False):
     L -= 1
     L *= n
 
-    temp = L - L[:,None]
+    temp = L - L[:, None]
     np.exp(temp, out=temp)
     w = np.sum(temp, axis=1)
     np.divide(1, w, out=w)
@@ -320,10 +321,10 @@ def gpdfitnew(x, sort=True, sort_in_place=False, return_quadrature=False):
     sigma = -k / b * n / (n - 0)
     # weakly informative prior for k
     a = 10
-    k = k * n / (n+a) + a * 0.5 / (n+a)
+    k = k * n / (n + a) + a * 0.5 / (n + a)
     if return_quadrature:
-        ks *= n / (n+a)
-        ks += a * 0.5 / (n+a)
+        ks *= n / (n + a)
+        ks += a * 0.5 / (n + a)
 
     if return_quadrature:
         return k, sigma, ks, w

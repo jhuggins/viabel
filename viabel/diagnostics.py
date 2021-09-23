@@ -133,13 +133,15 @@ def wasserstein_bounds(d2, *, samples=None, moment_bound_fn=None):
             raise ValueError('must provides samples if moment_bound_fn not given')
         samples = np.asarray(samples)
         if samples.ndim == 1:
-            samples = samples[:,np.newaxis]
+            samples = samples[:, np.newaxis]
         sample_mean = np.mean(samples, axis=0, keepdims=True)
         centered_samples = samples - sample_mean
-        moment_bound_fn = lambda p: np.mean(np.sum(centered_samples**p, axis=1))
+
+        def moment_bound_fn(p):
+            return np.mean(np.sum(centered_samples**p, axis=1))
     for p in [1, 2]:
-        Cp = moment_bound_fn(2*p)
-        results['W{}'.format(p)] = 2 * Cp**(.5/p) * np.expm1(d2)**(.5/p)
+        Cp = moment_bound_fn(2 * p)
+        results['W{}'.format(p)] = 2 * Cp**(.5 / p) * np.expm1(d2)**(.5 / p)
     return results
 
 
@@ -174,7 +176,7 @@ def divergence_bound(log_weights, *, alpha=2., log_norm_bound=None,
     rescaled_weights = np.exp(log_weights - log_rescale)**alpha
     mean_rescaled_weight = mean_and_check_mc_error(rescaled_weights,
                                                    quantity_name='CUBO')
-    cubo = np.log(mean_rescaled_weight)/alpha + log_rescale
+    cubo = np.log(mean_rescaled_weight) / alpha + log_rescale
     if log_norm_bound is None:
         log_norm_bound = mean_and_check_mc_error(log_weights,
                                                  quantity_name='ELBO')
@@ -186,8 +188,8 @@ def divergence_bound(log_weights, *, alpha=2., log_norm_bound=None,
 
 def mean_and_check_mc_error(a, atol=0.01, rtol=0.0, quantity_name=None):
     m = np.mean(a)
-    s = np.std(a)/np.sqrt(a.size)
-    if s > rtol*np.abs(m) + atol: # pragma: no cover
+    s = np.std(a) / np.sqrt(a.size)
+    if s > rtol * np.abs(m) + atol:  # pragma: no cover
         msg = 'significant Monte Carlo error'
         if quantity_name is not None:
             msg += ' when computing ' + quantity_name
@@ -196,8 +198,8 @@ def mean_and_check_mc_error(a, atol=0.01, rtol=0.0, quantity_name=None):
     return m
 
 
-_var_bound_const_1 = 2*np.sqrt(2)
-_var_bound_const_2 = 1 + 3*np.sqrt(2)
+_var_bound_const_1 = 2 * np.sqrt(2)
+_var_bound_const_2 = 1 + 3 * np.sqrt(2)
 
 
 def mean_bound(Wp):
