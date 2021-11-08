@@ -5,7 +5,7 @@ import time
 from hashlib import md5
 
 import autograd.numpy as np
-import pystan
+import stan
 
 
 def vectorize_if_needed(f, a, axis=-1):
@@ -75,7 +75,7 @@ def StanModel_cache(model_code=None, model_name=None, **kwargs):
         with open(cache_file, 'rb') as f:
             sm = pickle.load(f)
     else:
-        sm = pystan.StanModel(model_code=model_code, model_name=model_name)
+        sm = stan.build(program_code=model_code)
         with open(cache_file, 'wb') as f:
             pickle.dump(sm, f)
 

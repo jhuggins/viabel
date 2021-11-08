@@ -77,13 +77,14 @@ class Model(object):
         raise NotImplementedError()
 
 
-def _make_stan_log_density(fitobj):
+def _make_stan_log_density(model):
     @primitive
     def log_density(x):
-        return vectorize_if_needed(fitobj.log_prob, x)
+        return vectorize_if_needed(lambda t: model.log_prob(t.tolist()), x)
 
     def log_density_vjp(ans, x):
-        return lambda g: ensure_2d(g) * vectorize_if_needed(fitobj.grad_log_prob, x)
+        return lambda g: ensure_2d(
+            g) * vectorize_if_needed(lambda t: model.grad_log_prob(t.tolist()), x)
     defvjp(log_density, log_density_vjp)
     return log_density
 
@@ -91,14 +92,14 @@ def _make_stan_log_density(fitobj):
 class StanModel(Model):
     """Class that encapsulates a PyStan model."""
 
-    def __init__(self, fit):
+    def __init__(self, model):
         """
         Parameters
         ----------
-        fit : `StanFit4model` object
+        model : `stan.Model` object
         """
-        self._fit = fit
-        super().__init__(_make_stan_log_density(fit))
+        self._model = model
+        super().__init__(_make_stan_log_density(model))
 
     def constrain(self, model_param):
-        return self._fit.constrain_pars(model_param)
+        return self._model.constrain_pars(model_param.tolist())
