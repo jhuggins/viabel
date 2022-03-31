@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import autograd.numpy as np
 import autograd.numpy.random as npr
-from autograd import value_and_grad, vector_jacobian_product
+from autograd import value_and_grad, vector_jacobian_product, make_hvp
 from autograd.core import getval
 
 __all__ = [
@@ -49,7 +49,15 @@ class VariationalObjective(ABC):
 
         Should be called whenever a parameter that the objective depends on
         (e.g., `approx` or `model`) is updated."""
-
+    
+    def _hessian_vector_product(self, var_param, x):
+        """Compute hessian vector product at given variaitonal parameter point x. """
+        pass
+    
+    def update(self, var_param, direction):
+        """Update the variational parameter in optimization."""
+        return var_param - direction
+        
     @property
     def approx(self):
         """The approximation family."""
@@ -132,6 +140,10 @@ class ExclusiveKL(StochasticVariationalObjective):
                 lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
             return -lower_bound
         self._objective_and_grad = value_and_grad(variational_objective)
+
+    def _hessian_vector_product(self, var_param, x):
+        hvp = make_hvp(self.variational_objective)(var_param)[0]
+        return hvp(x)
 
 
 class DISInclusiveKL(StochasticVariationalObjective):
