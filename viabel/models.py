@@ -1,8 +1,6 @@
-from autograd.extend import primitive, defvjp
-import autograd.numpy as np
+from autograd.extend import defvjp, primitive
 
 from ._utils import ensure_2d, vectorize_if_needed
-
 
 __all__ = [
     'Model',
@@ -15,6 +13,7 @@ class Model(object):
 
     Does not support tempering. It can be overridden in part or in whole by
     classes that inherit it. See ``StanModel`` for an example."""
+
     def __init__(self, log_density):
         """
         Parameters
@@ -82,6 +81,7 @@ def _make_stan_log_density(fitobj):
     @primitive
     def log_density(x):
         return vectorize_if_needed(fitobj.log_prob, x)
+
     def log_density_vjp(ans, x):
         return lambda g: ensure_2d(g) * vectorize_if_needed(fitobj.grad_log_prob, x)
     defvjp(log_density, log_density_vjp)
@@ -90,6 +90,7 @@ def _make_stan_log_density(fitobj):
 
 class StanModel(Model):
     """Class that encapsulates a PyStan model."""
+
     def __init__(self, fit):
         """
         Parameters

@@ -1,11 +1,9 @@
-import numpy as np
-
+from viabel._psis import psislw
 from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import SASA, RMSProp
-from viabel._psis import psislw
+from viabel.optimization import FASO, RMSProp
 
 all = [
     'bbvi',
@@ -13,51 +11,61 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, approx=None, objective=None, fit=None, init_var_param=None, learning_rate=0.01, **kwargs):
+def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
+         approx=None, objective=None, fit=None, adaptive=True,
+         init_var_param=None, learning_rate=0.01,
+         RMS_kwargs=dict(), FASO_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
-    Currently the objective is optimized using ``viabel.optimization.SASA``.
+    Currently the objective is optimized using ``viabel.optimization.FASO``.
 
     Parameters
     ----------
     dimension : `int`
         Dimension of the model parameter.
-    n_iters : `int`
+    n_iters : `int`, optional
         Number of iterations of the optimization.
-    num_mc_samples : `int`
+    num_mc_samples : `int`, optional
         Number of Monte Carlo samples to use for estimating the gradient of
         the objective.
-    log_density : `function`
+    log_density : `function`, optional
         (Unnormalized) log density of the model. Must support automatic
         differentiation with ``autograd``. Either ``log_density`` or ``fit``
         must be provided.
-    approx : `ApproximationFamily` object
+    approx : `ApproximationFamily` object, optional
         The approximation family. The default is to use ``viabel.approximations.MFGaussian``.
     objective : `VariationalObjective` class
         The default is to use ``viabel.objectives.ExclusiveKL``.
-    fit : `StanFit4model` object
+    fit : `StanFit4model` object, optional
         If provided, a ``StanModel`` will be used. Both ``fit`` and
         ``log_density`` cannot be given.
-    init_var_param
+    init_var_param, optional
         Initial variational parameter.
-    **kwargs
-        Keyword arguments to pass to ``SASA`` and ``RMSProp``.
+    adaptive : `bool`, optional
+        If ``True``, use ``FASO`` with ``RMSProp``. Otherwise use ``RMSProp``.
+    learning_rate : `float`
+        Tuning parameter that determines the step size.
+    RMS_kwargs : `dict`, optional
+        Dictionary of keyword arguments to pass to ``RMSProp``.
+    FASO_kwargs : `dict`, optional
+         Dictionary of keyword arguments to pass to ``FASO``.
 
     Returns
     -------
     results : `dict`
-        Contains the following entries: `var_param`, `var_param_history`,
-        `objective`
+        Contains the following entries: `objective` and results from optimizer
     """
     if objective is not None:
         if fit is not None or log_density is not None or approx is not None:
-            raise ValueError('if objective is specified, cannot specify fit, log_density, or approx')
+            raise ValueError(
+                'if objective is specified, cannot specify fit, log_density, or approx')
         approx = objective.approx
         model = objective.model
     else:
         if log_density is None:
             if fit is None:
-                raise ValueError('either log_density or fit must be specified if objective not given')
+                raise ValueError(
+                    'either log_density or fit must be specified if objective not given')
             model = StanModel(fit)
         elif fit is None:
             model = Model(log_density)
@@ -68,13 +76,14 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None, appro
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    sasa = SASA(RMSProp(learning_rate, **kwargs), dimension, **kwargs)
-    sasa_results = sasa.optimize(n_iters, objective, init_var_param)
-    
-    results = dict(var_param=sasa_results['smoothed_opt_param'],
-                   var_param_history=sasa_results['variational_param_history'],
-                   objective=objective)
-    return results
+    base_opt = RMSProp(learning_rate, **RMS_kwargs)
+    if adaptive:
+        opt = FASO(base_opt, **FASO_kwargs)
+    else:
+        opt = base_opt
+    opt_results = opt.optimize(n_iters, objective, init_var_param)
+    opt_results['objective'] = objective
+    return opt_results
 
 
 def vi_diagnostics(var_param, *, objective=None, model=None, approx=None, n_samples=100000):
@@ -130,7 +139,8 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
     print()
     # if k-hat looks good, check other diagnostics
     if approx.supports_pth_moment(2) and approx.supports_pth_moment(4):
-        moment_bound_fn = lambda p: approx.pth_moment(var_param, p)
+        def moment_bound_fn(p):
+            return approx.pth_moment(var_param, p)
     else:
         moment_bound_fn = None
     _, q_var = approx.mean_and_cov(var_param)
@@ -139,10 +149,10 @@ def _vi_diagnostics(var_param, model, approx, n_samples):
                                    moment_bound_fn=moment_bound_fn,
                                    q_var=q_var))
     print('The 2-divergence is estimated to be d2 = {:.2g}'.format(results['d2']))
-    if results['d2'] > 4.6: # pragma: no cover
+    if results['d2'] > 4.6:  # pragma: no cover
         print('WARNING: d2 > 4.6 means the approximation is very inaccurate')
     elif results['d2'] > 0.1:
-        print('WARNING: 0.1 > d2 < 4.6 means the approximation is somewhat '
+        print('WARNING: 0.1 < d2 < 4.6 means the approximation is somewhat '
               'inaccurate. Use importance sampling to decrease error.')
     else:
         print('\nAll diagnostics pass.')

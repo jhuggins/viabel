@@ -31,7 +31,7 @@ def get_long_description():
 
 setup(
     name = 'viabel',
-    version='0.4.0',
+    version='0.4.2',
     description='Efficient, lightweight variational inference and approximation bounds',
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
@@ -39,6 +39,7 @@ setup(
     author_email='huggins@bu.edu',
     url='https://github.com/jhuggins/viabel/',
     packages=['viabel'],
+    include_package_data=True,
     install_requires=get_requirements(),
     extras_require={ 'docs' : get_requirements_docs(),
                      'dev' : get_requirements_dev()

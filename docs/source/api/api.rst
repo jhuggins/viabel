@@ -22,6 +22,8 @@ Approximation Families
    MFGaussian
    MFStudentT
    MultivariateT
+   NeuralNet
+   NVPFlow
 
 Models
 ------
@@ -42,6 +44,7 @@ Variational Objectives
 
    VariationalObjective
    ExclusiveKL
+   DISInclusiveKL
    AlphaDivergence
 
 Diagnostics
@@ -66,4 +69,4 @@ Optimization
    StochasticGradientOptimizer
    RMSProp
    AdaGrad
-   SASA
+   FASO

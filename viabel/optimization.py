@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
-import tqdm
+
 import autograd.numpy as np
-from scipy.stats import t as tdist
+import tqdm
+
+from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
+from viabel._utils import Timer
 from viabel.approximations import MFGaussian
 
 __all__ = [
@@ -9,14 +12,15 @@ __all__ = [
     'StochasticGradientOptimizer',
     'RMSProp',
     'AdaGrad',
-    'SASA' 
+    'WindowedAdaGrad',
+    'FASO'
 ]
 
 
 class Optimizer(ABC):
     """An abstract class for optimization
     """
-    
+
     @abstractmethod
     def optimize(self, n_iters, objective, init_param, **kwargs):
         """
@@ -28,218 +32,334 @@ class Optimizer(ABC):
             Function for constructing the objective and gradient function
         init_param : `numpy.ndarray`, shape(var_param_dim,)
             Initial values of the variational parameters
-        **kwargs  
+        **kwargs
             Keyword arguments to pass (example: smoothed_prop)
-            
+
         Returns
         ----------
-        Dictionary
-        smoothed_opt_param : `numpy.ndarray`, shape(var_param_dim,)
-            Iterate averaged estimated variational parameters 
-        variational_param_history : `numpy.ndarray`, shape(n_iters, var_param_dim)\
-            Estimated variational parameters over all iterations
-        value_history : `numpy.ndarray`, shape(n_iters,)
-            Estimated loss (ELBO) over all iterations
+        results : `dict`
+            Must contain at least `opt_param`, the estimate for the optimal
+            variational parameter.
         """
-        pass
-    
+
+
 class StochasticGradientOptimizer(Optimizer):
-    """An abstract class of descent direction and a subclass of Optimizer
+    """Stochastic gradient descent.
     """
-    def __init__(self, learning_rate):
-        self._learning_rate = learning_rate
-        
-    def optimize(self, n_iters, objective, init_param, smoothed_prop=0.2):
-        variational_param = init_param.copy()
-        smoothing_window = int(n_iters*smoothed_prop)
-        history = None
-        value_history = []
-        variational_param_history = []
-        descent_dir_history = []
-        for t in tqdm.trange(n_iters):
-            object_val, object_grad = objective(variational_param)
-            value_history.append(object_val)
-            descent_dir, history = self.descent_direction(object_grad, history)
-            variational_param -= self._learning_rate * descent_dir
-            variational_param_history.append(variational_param)
-            descent_dir_history.append(descent_dir)
-        variational_param_history = np.array(variational_param_history)
-        variational_param_latter = variational_param_history[-smoothing_window:,:]
-        smoothed_opt_param = np.mean(variational_param_latter, axis = 0)    
-        return dict(smoothed_opt_param = smoothed_opt_param,
-                    variational_param_history = variational_param_history,
-                    value_history = np.array(value_history)) 
-            
-    @abstractmethod
-    def descent_direction(self, grad, history):
+
+    def __init__(self, learning_rate, *, weight_decay=0, iterate_avg_prop=0.2, diagnostics=False):
         """
         Parameters
         -----------
         learning_rate : `float`
             Tuning parameter that determines the step size
-        beta : `float`, optional
-            Discounting factor for the history. The default value is 0.9
-        jitter : `float`, optional
-            Smoothing term that avoids division by zero
-        
+        weight_decay: `float`
+            L2 regularization weight
+        iterate_avg_prop : `float`
+            Proportion of iterates to use for computing iterate average. `None`
+            means no iterate averaging. The default is 0.2.
+        diagnostics : `bool`, optional
+            Record diagnostic information if `True`. The default is `False`.
+        """
+        self._learning_rate = learning_rate
+        self._weight_decay = weight_decay
+        if iterate_avg_prop is not None and (iterate_avg_prop > 1.0
+                                             or iterate_avg_prop <= 0.0):
+            raise ValueError('"iterate_avg_prop" must be None or between 0 and 1')
+        self._iterate_avg_prop = iterate_avg_prop
+        self._diagnostics = diagnostics
+        self.reset_state()
+
+    def reset_state(self):
+        """Reset internal state of the optimizer"""
+
+    def optimize(self, n_iters, objective, init_param):
+        variational_param = init_param.copy()
+        iap = self._iterate_avg_prop
+        value_history = []
+        variational_param_history = []
+        descent_dir_history = []
+        with tqdm.trange(n_iters) as progress:
+            try:
+                for k in progress:
+                    # take step in descent direction
+                    object_val, object_grad = objective(variational_param)
+                    descent_dir = self.descent_direction(object_grad)
+                    variational_param -= self._learning_rate * descent_dir
+                    if variational_param.ndim == 2:
+                        variational_param *= (1 - self._weight_decay)
+                    # record state information
+                    value_history.append(object_val)
+                    if self._diagnostics or iap is not None:
+                        variational_param_history.append(variational_param.copy())
+                        if (iap is not None and len(variational_param_history) > iap * k):
+                            variational_param_history.pop(0)
+                    if self._diagnostics:
+                        descent_dir_history.append(descent_dir)
+                    if k % 10 == 0:
+                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        progress.set_description(
+                            'average loss = {:,.5g}'.format(avg_loss))
+            except (KeyboardInterrupt, StopIteration):  # pragma: no cover
+                # do not print log on the same line
+                progress.close()
+            finally:
+                progress.close()
+        results = dict(value_history=value_history)
+        variational_param_history = np.array(variational_param_history)
+        if iap is not None:
+            window = max(1, int(k * iap))
+            opt_param = np.mean(variational_param_history[-window:], axis=0)
+        else:
+            results['opt_param'] = variational_param.copy()
+        if descent_dir_history is not None:
+            results['descent_dir_history'] = descent_dir_history
+        return dict(opt_param=opt_param,
+                    variational_param_history=variational_param_history,
+                    value_history=np.array(value_history),
+                    descent_dir_history=np.array(descent_dir_history),
+                    )
+
+    def descent_direction(self, grad):
+        """Compute descent direction for optimization.
+
+        Default implementation returns ``grad``.
+
+        Parameters
+        -----------
+        grad : `numpy.ndarray`, shape(var_param_dim,)
+            (stochastic) gradient of the objective function
+
         Returns
         ----------
         descent_dir : `numpy.ndarray`, shape(var_param_dim,)
             Descent direction of the optimization algorithm
-        history 
-            History of the decaying estimated squared gradient
         """
-        pass
+        return grad
 
 
 class RMSProp(StochasticGradientOptimizer):
-    """RMSprop optimization method        
+    """RMSProp optimization method
     """
-    def __init__(self, learning_rate, beta=0.9, jitter=1e-8):
+
+    def __init__(self, learning_rate, *, weight_decay=0, beta=0.9, jitter=1e-8,
+                 diagnostics=False):
         self._beta = beta
         self._jitter = jitter
-        super().__init__(learning_rate)
-        
-    def descent_direction(self, grad, history):
-        if history is None:
-            history  = grad**2
-        history = history*self._beta + (1.-self._beta)*grad**2    
-        descent_dir = grad / np.sqrt(self._jitter+history)
-        return (descent_dir, history)
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+
+    def reset_state(self):
+        self._avg_grad_sq = None
+
+    def descent_direction(self, grad):
+        if self._avg_grad_sq is None:
+            avg_grad_sq = grad**2
+        else:
+            avg_grad_sq = self._avg_grad_sq
+        avg_grad_sq *= self._beta
+        avg_grad_sq += (1. - self._beta) * grad**2
+        descent_dir = grad / np.sqrt(self._jitter + avg_grad_sq)
+        self._avg_grad_sq = avg_grad_sq
+        return descent_dir
+
+
+class WindowedAdaGrad(StochasticGradientOptimizer):
+    """Adam optimization method
+    """
+
+    def __init__(self, learning_rate, *, weight_decay=0, window_size=10, jitter=1e-8,
+                 diagnostics=False):
+        self._window_size = window_size
+        self._jitter = jitter
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+
+    def reset_state(self):
+        self._history = []
+
+    def descent_direction(self, grad):
+        self._history.append(grad**2)
+        if len(self._history) > self._window_size:
+            self._history.pop(0)
+        mean_grad_squared = np.mean(self._history, axis=0)
+        descent_dir = grad / np.sqrt(self._jitter + mean_grad_squared)
+        return descent_dir
 
 
 class AdaGrad(StochasticGradientOptimizer):
     """Adagrad optimization method
     """
-    def __init__(self, learning_rate, jitter=1e-8):
+
+    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
         self._jitter = jitter
-        super().__init__(learning_rate)
-        
-    def descent_direction(self, grad, history):
-        if history is None:
-            history = grad**2
-        history = history + grad**2   
-        descent_dir = grad / np.sqrt(self._jitter+history)
-        return (descent_dir, history)
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+
+    def reset_state(self):
+        self._sum_grad_sq = 0
+
+    def descent_direction(self, grad):
+        self._sum_grad_sq += grad**2
+        descent_dir = grad / np.sqrt(self._jitter + self._sum_grad_sq)
+        return descent_dir
 
 
+class FASO(Optimizer):
+    """Fixed-learning rate stochastic optimization meta-algorithm
 
-class SASA(Optimizer):
-    """A class of Statistical Adaptive Stochastic Gradient Optimizer
-        
     Parameters
     ----------
-    sgo : `class`
-        A subclass of StochasticGradientOptimizer
-    dim : `int`
-        dimension of the underlyin parameter space
-    theta : `float`, optional
-        Fraction of the samples to use for testing. The default is 1/8
-    rho : `float`, optional
-        Learning rate reducing factor. The default is 0.5
-    W0 : `int`, optional
-        Minimum number of samples for tesing. The default is 1000.
-    t_check : `int`, optional
-        Period to perform statistical test. The default is 100.
-    delta : `float, optional
-        Significance level to compute the confidence interval. The default is 0.05. 
-    eps : `float`, optional
-        Threshold to determine the stopping iterations. The default is 1e-3.
+    sgo : `StochasticGradientOptimizer` object
+        optimization method to use
+    mcse_threshold : `float` optional
+        Monte Carlo standard error threshold for convergence. The default is 0.1.
+    W_min : `int`, optional
+        Minimum window size for checking convergence. The default is 200.
+    ESS_min : `int`, optional
+        Minimum ESS for computing iterate average. Default is `W_min / 8`.
+    k_check : `int`, optional
+        Frequency with which to check convergence. The default is `W_min`.
     """
-    def __init__(self, sgo, dim, theta=1/8, rho=0.5, W0 = 1000, t_check = 100, delta = 0.05, eps = 1e-3):
+
+    def __init__(self, sgo, *, mcse_threshold=0.1, W_min=200, ESS_min=None,
+                 k_check=None):
         if not isinstance(sgo, StochasticGradientOptimizer):
             raise ValueError('sgo must be a subclass of StochasticGradientOptimizer')
         self._sgo = sgo
-        self._dim = dim
-        self._theta = theta
-        self._rho = rho
-        self._W0 = W0
-        self._t_check = t_check
-        self._delta = delta
-        self._eps = eps
-        
-    def convergence_check(self, W, Delta_history):
-        """
-        Parameters
-        ----------
-        W : `int`
-            Window size to use for the convergence check
-        Delta_history : `numpy.ndarray`
-            Computed Delta values
+        self._mcse_threshold = mcse_threshold
+        self._W_min = W_min
+        self._ESS_min = W_min // 8 if ESS_min is None else ESS_min
+        self._k_check = W_min if k_check is None else k_check
+        if mcse_threshold <= 0:
+            raise ValueError('"mcse_threshold" must be greater than zero')
+        if W_min <= 0:
+            raise ValueError('"W_min" must be greater than zero')
+        if self._k_check <= 0:
+            raise ValueError('"k_check" must be greater than zero')
+        if self._ESS_min <= 0:
+            raise ValueError('"ESS_min" must be greater than zero')
 
-        Returns
-        -------
-        bool
-            Indicates whether the convergence reached or not
-        """
-        m = b = np.floor(np.sqrt(W)).astype(int)
-        Delta_reshaped = np.reshape(Delta_history[-m*b:],(m,b))
-        mu_n = np.mean(Delta_reshaped)
-        Delta_batch_means = np.mean(Delta_reshaped,axis=1)
-        sigma_n = np.sqrt((m/(b-1))* np.sum((Delta_batch_means - mu_n)**2))
-        sd_error = tdist.ppf(1-self._delta/2, df=b-1) * (sigma_n/np.sqrt(m*b))
-        lower = mu_n - sd_error
-        upper = mu_n + sd_error
-        
-        if lower<0 and upper>0:
-            return True
-        else:
-            return False
-            
-        
     def optimize(self, n_iters, objective, init_param):
-        """
-        Parameters
-        ----------
-        n_iters : `int`
-            Number of iterations of the optimization
-        objective: `function`
-            Function for constructing the objective and gradient function
-        init_param : `numpy.ndarray`, shape(var_param_dim,)
-            Initial values of the variational parameters
-        int_learning_rate: `float`
-            Initial learning rate of optimization (step size to reach the (local) minimum)
-            
-        Returns
-        ----------
-        Dictionary
-            smoothed_opt_param : `numpy.ndarray`, shape(var_param_dim,)
-                 Iterate averaged estimated variational parameters 
-            variational_param_history : `numpy.ndarray`, shape(n_iters, var_param_dim)
-                Estimated variational parameters over all iterations
-            value_history : `numpy.ndarray`, shape(n_iters,)
-                 Estimated loss (ELBO) over all iterations
-        """
-        t0 = 0
-        history = None
+        dim = init_param.size
+        diagnostics = self._sgo._diagnostics
+        k_conv = None  # Iteration number when reached convergence
+        k_stopped = None  # Iteration number when MCSE/ESS conditions met
+        k_Rhat = None  # Iteration number when R hat convergence criterion met
         learning_rate = self._sgo._learning_rate
         variational_param = init_param.copy()
-        variational_param_mean = init_param.copy()
-        value_history = []
-        Delta_history = []
         variational_param_history = []
-        for t in tqdm.trange(n_iters):
-            object_val, object_grad = objective(variational_param)
-            value_history.append(object_val)
-            descent_dir, history = self._sgo.descent_direction(object_grad, history)
-            variational_param -= learning_rate * descent_dir
-            variational_param_history.append(variational_param)
-            Delta = np.dot(variational_param,descent_dir) - 0.5*learning_rate*np.sum(descent_dir**2)
-            Delta_history.append(Delta)
-            W = np.max([np.min([t-t0, self._W0]), np.ceil(self._theta*(t-t0)).astype(int)])
-            if (W >= self._W0) and (t % self._t_check == 0):
-                convg = self.convergence_check(W, Delta_history)
-                if convg == True:
-                    m = b = np.floor(np.sqrt(W)).astype(int)
-                    learning_rate = self._rho * learning_rate
-                    variational_param_mean_prev = variational_param_mean
-                    variational_param_mean = np.mean(np.array(variational_param_history[-m*b:]),axis = 0)
-                    t0 = t
-                    SKL = MFGaussian(self._dim)._kl(variational_param_mean_prev, variational_param_mean) + MFGaussian(self._dim)._kl(variational_param_mean, variational_param_mean_prev)       
-                    if (SKL/self._rho < self._eps):
-                        print('Stopping rule reached at', t+1, 'th iteration')
-                        break
-        return dict(smoothed_opt_param = variational_param_mean,
-                    variational_param_history = variational_param_history,
-                    value_history = np.array(value_history)) 
-    
+        value_history = []
+        descent_dir_history = []
+        ess_and_mcse_k_history = []
+        ess_history = []
+        mcse_history = []
+        iterate_average_k_history = []
+        iterate_average_history = []
+        iterate_average = variational_param.copy()
+        if diagnostics:
+            iterate_average_k_history.append(0)
+            iterate_average_history.append(iterate_average)
+        total_opt_time = 0  # total time spent on optimization
+        with tqdm.trange(n_iters) as progress:
+            try:
+                for k in progress:
+                    # take step in descent direction
+                    with Timer() as opt_timer:
+                        object_val, object_grad = objective(variational_param)
+                        value_history.append(object_val)
+                        descent_dir = self._sgo.descent_direction(object_grad)
+                        variational_param -= learning_rate * descent_dir
+                        variational_param_history.append(variational_param.copy())
+                        if diagnostics:
+                            descent_dir_history.append(descent_dir)
+                    total_opt_time += opt_timer.interval
+                    # If convergence has not been reached then check for
+                    # convergence using R hat
+                    if k_conv is None and k % self._k_check == 0:
+                        W_upper = int(0.95 * k)
+                        if W_upper > self._W_min:
+                            windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
+                            R_hat_success, best_W = R_hat_convergence_check(
+                                variational_param_history, windows)
+                            iterate_average = np.mean(variational_param_history[-best_W:], axis=0)
+                            if diagnostics:
+                                iterate_average_k_history.append(k)
+                                iterate_average_history.append(iterate_average)
+                            if R_hat_success:
+                                k_Rhat = k
+                                k_conv = k - best_W
+                                W_check = best_W  # immediately check MCSE
+
+                    # Once convergence has been reached compute the MCSE
+                    if k_conv is not None and k - k_conv == W_check:
+                        W = W_check
+                        converged_iterates = np.array(variational_param_history[-W:])
+                        iterate_average = np.mean(converged_iterates, axis=0)
+                        if diagnostics and k not in iterate_average_k_history:
+                            iterate_average_k_history.append(k)
+                            iterate_average_history.append(iterate_average)
+                        # compute MCSE
+                        with Timer() as mcse_timer:
+                            if isinstance(objective.approx, MFGaussian):
+                                # For MF Gaussian, use MCSE(mu/sigma,log_sigma)
+                                iterate_diff = (converged_iterates[W - 2, :]
+                                                - converged_iterates[W - 1, :])
+                                iterate_diff_zero = iterate_diff == 0
+                                # ignore constant variational parameters
+                                if np.any(iterate_diff_zero):
+                                    indices = np.argwhere(iterate_diff_zero)
+                                    converged_iterates = np.delete(converged_iterates, indices, 1)
+                                converged_log_sdevs = converged_iterates[:, -dim:]
+                                mean_log_stdev = np.mean(converged_log_sdevs, axis=0)
+                                ess, mcse = MCSE(converged_iterates)
+                                mcse_mean = mcse[:dim] / np.exp(mean_log_stdev)
+                                mcse_stdev = mcse[-dim:]
+                                mcse = np.concatenate((mcse_mean, mcse_stdev))
+                            else:
+                                ess, mcse = MCSE(converged_iterates)
+                        if diagnostics:
+                            ess_and_mcse_k_history.append(k)
+                            ess_history.append(ess)
+                            mcse_history.append(mcse)
+                        if (np.max(mcse) < self._mcse_threshold and np.min(ess) > self._ESS_min):
+                            k_stopped = k
+                            break
+                        else:
+                            relative_mcse_time = mcse_timer.interval / W
+                            relative_opt_time = total_opt_time / k
+                            relative_time_ratio = relative_opt_time / relative_mcse_time
+                            recheck_scale = max(1.05, 1 + 1 / np.sqrt(1 + relative_time_ratio))
+                            W_check = int(recheck_scale * W_check + 1)
+                    if k % self._k_check == 0:
+                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        R_conv = 'converged' if k_conv is not None else 'not converged'
+                        progress.set_description(
+                            'average loss = {:,.5g} | R hat {}|'.format(avg_loss, R_conv))
+            except (KeyboardInterrupt, StopIteration):  # pragma: no cover
+                # do not print log on the same line
+                progress.close()
+            finally:
+                progress.close()
+        if k_stopped is None:
+            if k_conv is None:
+                print('WARNING: stationarity not reached after maximum number of iterations')
+                print('WARNING: try incresing the learning rate or the maximum number of '
+                      'iterations')
+            else:
+                print('WARNING: stationarity reached but MCSE too large and/or ESS too small')
+                print('WARNING: maximum MCSE = {:.3g}'.format(np.max(mcse)))
+                print('WARNING: minimum ESS = {:.1f}'.format(np.min(ess)))
+                print(ess)
+        else:
+            print('Convergence reached at iteration', k_stopped)
+        return dict(opt_param=iterate_average,
+                    k_conv=k_conv,
+                    k_Rhat=k_Rhat,
+                    k_stopped=k_stopped,
+                    variational_param_history=np.array(variational_param_history),
+                    value_history=np.array(value_history),
+                    iterate_average_k_history=np.array(iterate_average_k_history),
+                    iterate_average_history=np.array(iterate_average_history),
+                    descent_dir_history=np.array(descent_dir_history),
+                    ess_and_mcse_k_history=np.array(ess_and_mcse_k_history),
+                    ess_history=np.array(ess_history),
+                    mcse_history=np.array(mcse_history)
+                    )

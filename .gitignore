@@ -4,6 +4,7 @@ __pycache__/
 
 # pickles
 *.pkl
+*.pck
 
 # C extensions
 *.so
@@ -12,6 +13,7 @@ __pycache__/
 *.egg-info
 .coverage
 htmlcov/
+dist/
 
 # generated docs
 build/

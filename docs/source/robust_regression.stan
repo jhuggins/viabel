@@ -12,3 +12,4 @@ parameters {
 model {
   beta ~ normal(0, 10);
   y ~ student_t(df, x * beta, 1);  // likelihood
+}
