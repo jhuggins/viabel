@@ -70,3 +70,4 @@ Optimization
    RMSProp
    AdaGrad
    FASO
+   RAABBVI
