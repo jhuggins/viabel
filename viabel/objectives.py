@@ -139,11 +139,12 @@ class ExclusiveKL(StochasticVariationalObjective):
             else:
                 lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
             return -lower_bound
+        self._hvp = make_hvp(variational_objective)
         self._objective_and_grad = value_and_grad(variational_objective)
 
     def _hessian_vector_product(self, var_param, x):
-        hvp = make_hvp(self.variational_objective)(var_param)[0]
-        return hvp(x)
+        hvp_fun = self._hvp(var_param)[0]
+        return hvp_fun(x)
 
 
 class DISInclusiveKL(StochasticVariationalObjective):

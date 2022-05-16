@@ -68,6 +68,9 @@ Optimization
    Optimizer
    StochasticGradientOptimizer
    RMSProp
-   AdaGrad
+   Adagrad
+   WindowedAdagrad
+   AveragedRMSProp
+   AveragedAdam
    FASO
    RAABBVI

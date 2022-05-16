@@ -11,8 +11,10 @@ __all__ = [
     'Optimizer',
     'StochasticGradientOptimizer',
     'RMSProp',
-    'AdaGrad',
-    'WindowedAdaGrad',
+    'Adagrad',
+    'WindowedAdagrad',
+    'AveragedRMSProp',
+    'AveragedAdam',
     'FASO',
     'RAABBVI'
 ]
@@ -142,6 +144,19 @@ class StochasticGradientOptimizer(Optimizer):
 
 class RMSProp(StochasticGradientOptimizer):
     """RMSProp optimization method
+    
+    Parameters
+    -----------
+    beta : `float` optional
+        hyper-parameter. The default is 0.9
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
+        
     """
 
     def __init__(self, learning_rate, *, weight_decay=0, beta=0.9, jitter=1e-8,
@@ -151,6 +166,11 @@ class RMSProp(StochasticGradientOptimizer):
         super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
+        """
+        resetting the state
+
+        """
+
         self._avg_grad_sq = None
 
     def descent_direction(self, grad):
@@ -165,8 +185,20 @@ class RMSProp(StochasticGradientOptimizer):
         return descent_dir
 
 
-class WindowedAdaGrad(StochasticGradientOptimizer):
+class WindowedAdagrad(StochasticGradientOptimizer):
     """Adam optimization method
+    
+    Parameters
+    -----------
+    window size : `int` optional
+        Window size used to store the square of the gradients. The default is 10
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
     """
 
     def __init__(self, learning_rate, *, weight_decay=0, window_size=10, jitter=1e-8,
@@ -176,6 +208,9 @@ class WindowedAdaGrad(StochasticGradientOptimizer):
         super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
+        """
+        resetting the state
+        """
         self._history = []
 
     def descent_direction(self, grad):
@@ -187,8 +222,18 @@ class WindowedAdaGrad(StochasticGradientOptimizer):
         return descent_dir
 
 
-class AdaGrad(StochasticGradientOptimizer):
+class Adagrad(StochasticGradientOptimizer):
     """Adagrad optimization method
+    
+    Parameters
+    -----------
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
     """
 
     def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
@@ -196,6 +241,9 @@ class AdaGrad(StochasticGradientOptimizer):
         super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
 
     def reset_state(self):
+        """
+        resetting the state
+        """
         self._sum_grad_sq = 0
 
     def descent_direction(self, grad):
@@ -205,6 +253,18 @@ class AdaGrad(StochasticGradientOptimizer):
 
 class AveragedRMSProp(StochasticGradientOptimizer):
     """Averaged RMSProp optimization method
+    
+    Parameters
+    -----------
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+    component_wise: `boolean` optional
+        Indication of  component wise discent direction computation
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
     """
     def __init__(self, learning_rate, *, jitter=1e-8,
                  diagnostics=False, component_wise=True):
@@ -213,6 +273,10 @@ class AveragedRMSProp(StochasticGradientOptimizer):
         super().__init__(learning_rate, diagnostics=diagnostics)
 
     def reset_state(self):
+        """
+        resetting the state
+        """
+
         self._avg_grad_sq = None
         self._t = None
 
@@ -236,6 +300,20 @@ class AveragedRMSProp(StochasticGradientOptimizer):
         
 class AveragedAdam(StochasticGradientOptimizer):
     """Averaged Adam optimization method
+    
+    Parameters
+    ----------
+    beta_1 : `float` optional
+        hyper-parameter. The default is 0.9
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+    component_wise: `boolean` optional
+        Indication of  component wise discent direction computation
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
     """
     def __init__(self, learning_rate, *, beta_1=0.9, jitter=1e-8,
                  diagnostics=False, component_wise=True):
@@ -245,6 +323,9 @@ class AveragedAdam(StochasticGradientOptimizer):
         super().__init__(learning_rate, diagnostics=diagnostics)
 
     def reset_state(self):
+        """
+        resetting the state
+        """
         self._avg_grad_sq = None
         self._t = None
         self._momentum = None

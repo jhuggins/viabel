@@ -4,9 +4,9 @@ import pytest
 from autograd import grad
 
 from viabel.optimization import (
-    RAABBVI, FASO, AdaGrad, RMSProp, 
+    RAABBVI, FASO, Adagrad, RMSProp, 
     AveragedAdam, AveragedRMSProp,
-    StochasticGradientOptimizer, WindowedAdaGrad)
+    StochasticGradientOptimizer, WindowedAdagrad)
 
 
 class DummyApproximationFamily:
@@ -67,7 +67,7 @@ def test_adagrad_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = AdaGrad(0.1)
+        sgd = Adagrad(0.1)
         _test_optimizer(sgd, objective, true_value, 20000)
 
 
@@ -75,7 +75,7 @@ def test_windowed_adagrad_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = WindowedAdaGrad(0.01)
+        sgd = WindowedAdagrad(0.01)
         _test_optimizer(sgd, objective, true_value, 20000)
 
 
