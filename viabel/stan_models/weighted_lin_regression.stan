@@ -1,4 +1,8 @@
 data {
+    // weighted regression model used to estimate constants that required to 
+    // compute error between for a given learning-rate variational approximation
+    // and the optimal variational approximation for general approximation family
+    // with any adaptive stochastic gradient descent
    int<lower=0> N;
    vector[N] y; // log(SKL)
    vector[N] x; // log(\gamma) 

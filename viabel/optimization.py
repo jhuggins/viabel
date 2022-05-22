@@ -6,11 +6,13 @@ import tqdm
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer, StanModel_cache
 from viabel.approximations import MFGaussian
+from collections import defaultdict
 
 __all__ = [
     'Optimizer',
     'StochasticGradientOptimizer',
     'RMSProp',
+    'Adam',
     'Adagrad',
     'WindowedAdagrad',
     'AveragedRMSProp',
@@ -50,7 +52,8 @@ class StochasticGradientOptimizer(Optimizer):
     """Stochastic gradient descent.
     """
 
-    def __init__(self, learning_rate, *, weight_decay=0, iterate_avg_prop=0.2, diagnostics=False):
+    def __init__(self, learning_rate, *, weight_decay=0, iterate_avg_prop=0.2,
+                 diagnostics=False):
         """
         Parameters
         -----------
@@ -89,7 +92,8 @@ class StochasticGradientOptimizer(Optimizer):
                     # take step in descent direction
                     object_val, object_grad = objective(variational_param)
                     descent_dir = self.descent_direction(object_grad)
-                    variational_param = objective.update(variational_param, self._learning_rate * descent_dir)
+                    variational_param = objective.update(variational_param, 
+                                             self._learning_rate * descent_dir)
                     if variational_param.ndim == 2:
                         variational_param *= (1 - self._weight_decay)
                     # record state information
@@ -143,12 +147,19 @@ class StochasticGradientOptimizer(Optimizer):
 
 
 class RMSProp(StochasticGradientOptimizer):
-    """RMSProp optimization method
+    """RMSProp optimization method (Hinton and Tieleman, 2012)
+    
+    Tracks the exponential moving average of squared gradient. 
+    \(\nu^{(k+1)} = \beta \nu^{(k)} + (1-\beta) \hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\)
+    
+    Uses \(\nu^{(k)}\) to rescale the current stochastic gradient: 
+        \(\hat{g}^{(k+1)}/\sqrt{\nu^{(k)}}\).
     
     Parameters
     -----------
     beta : `float` optional
-        hyper-parameter. The default is 0.9
+        Hyper-parameter. The default is 0.9
     jitter: `float` optional
         Small value used for numerical stability. The default is 1e-8
 
@@ -163,14 +174,13 @@ class RMSProp(StochasticGradientOptimizer):
                  diagnostics=False):
         self._beta = beta
         self._jitter = jitter
-        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+        super().__init__(learning_rate, weight_decay=weight_decay, \
+                         diagnostics=diagnostics)
 
     def reset_state(self):
         """
-        resetting the state
-
+        resetting \(\nu\), the exponential moving average of squared gradient
         """
-
         self._avg_grad_sq = None
 
     def descent_direction(self, grad):
@@ -185,74 +195,19 @@ class RMSProp(StochasticGradientOptimizer):
         return descent_dir
 
 
-class WindowedAdagrad(StochasticGradientOptimizer):
-    """Adam optimization method
-    
-    Parameters
-    -----------
-    window size : `int` optional
-        Window size used to store the square of the gradients. The default is 10
-    jitter: `float` optional
-        Small value used for numerical stability. The default is 1e-8
-
-    Returns
-    ----------
-    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
-        Descent direction of the optimization algorithm
-    """
-
-    def __init__(self, learning_rate, *, weight_decay=0, window_size=10, jitter=1e-8,
-                 diagnostics=False):
-        self._window_size = window_size
-        self._jitter = jitter
-        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
-
-    def reset_state(self):
-        """
-        resetting the state
-        """
-        self._history = []
-
-    def descent_direction(self, grad):
-        self._history.append(grad**2)
-        if len(self._history) > self._window_size:
-            self._history.pop(0)
-        mean_grad_squared = np.mean(self._history, axis=0)
-        descent_dir = grad / np.sqrt(self._jitter + mean_grad_squared)
-        return descent_dir
-
-
-class Adagrad(StochasticGradientOptimizer):
-    """Adagrad optimization method
-    
-    Parameters
-    -----------
-    jitter: `float` optional
-        Small value used for numerical stability. The default is 1e-8
-
-    Returns
-    ----------
-    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
-        Descent direction of the optimization algorithm
-    """
-
-    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
-        self._jitter = jitter
-        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
-
-    def reset_state(self):
-        """
-        resetting the state
-        """
-        self._sum_grad_sq = 0
-
-    def descent_direction(self, grad):
-        self._sum_grad_sq += grad**2
-        descent_dir = grad / np.sqrt(self._jitter + self._sum_grad_sq)
-        return descent_dir
-
 class AveragedRMSProp(StochasticGradientOptimizer):
-    """Averaged RMSProp optimization method
+    """Averaged RMSProp optimization method (Mukkamala and Hein, 2017, §4)
+    
+    Uses averaged squared gradient by setting \(\beta_k = 1-1/k\). 
+    \(\nu^{(k+1)} = \beta_k \nu^{(k)} + (1-\beta_k) \hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\)
+    
+    Then,
+    \(\nu^{(k+1)} = (k+1)^{-1} \sum^k_{k^\\prime =0}\hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\),
+    
+    where \(\nu^{(k)}\) converges to a constant almost surely under certain 
+    conditions.
     
     Parameters
     -----------
@@ -274,9 +229,9 @@ class AveragedRMSProp(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting the state
+        resetting \(\nu\) and k, the exponential moving average of squared 
+        gradient and iteration respectively
         """
-
         self._avg_grad_sq = None
         self._t = None
 
@@ -297,9 +252,83 @@ class AveragedRMSProp(StochasticGradientOptimizer):
         self._avg_grad_sq = avg_grad_sq
         self._t = t
         return descent_dir
+    
+class Adam(StochasticGradientOptimizer):
+    """Adam optimization method (Kingma and Ba, 2015)
+    
+    Tracks exponential moving average of the gradient as well as the 
+    squared gradient 
+    \(m^{(k+1)} = \beta_1 m^{(k)} + (1-\beta_1) \hat{g}^{(k)}\)
+    \(\nu^{(k+1)} = \beta_2 \nu^{(k)} + (1-\beta_2) \hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\)
+    
+    Uses \(m^{(k)}, \nu^{(k)}\) to rescale the current stochastic gradient: 
+        \(m^{(k)}}/\sqrt{\nu^{(k)}}\).
         
+    Parameters
+    ----------
+    beta_1 : `float` optional
+        hyper-parameter. The default is 0.9
+    beta_2 : `float` optional
+        hyper-parameter. The default is 0.999
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+    component_wise: `boolean` optional
+        Indication of  component wise discent direction computation
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
+    """
+    def __init__(self, learning_rate, *, beta_1=0.9, beta_2=0.999, jitter=1e-8,
+                 diagnostics=False):
+        self._beta_1 = beta_1
+        self._beta_2 = beta_2
+        self._jitter = jitter
+        super().__init__(learning_rate, diagnostics=diagnostics)
+
+    def reset_state(self):
+        """
+        resetting \(m \ \text{and} \ \nu\), the exponential moving average of 
+        gradient and squared gradient respectively
+        """
+        self._momentum = None
+        self._avg_grad_sq = None
+
+    def descent_direction(self, grad):
+        if self._avg_grad_sq is None:
+            avg_grad_sq = grad**2
+        else:
+            avg_grad_sq = self._avg_grad_sq
+        
+        if self._momentum is None:
+            momentum = grad
+        else:
+            momentum = self._momentum
+        
+        momentum *= self._beta_1
+        momentum += (1. - self._beta_1) * grad
+        avg_grad_sq *= self._beta_2
+        avg_grad_sq += (1. - self._beta_2) * grad**2
+        descent_dir = momentum / np.sqrt(self._jitter + avg_grad_sq)
+        self._momentum = momentum
+        self._avg_grad_sq = avg_grad_sq
+        return descent_dir
+    
 class AveragedAdam(StochasticGradientOptimizer):
-    """Averaged Adam optimization method
+    """Averaged Adam optimization method (Mukkamala and Hein, 2017, §4)
+    
+    Uses averaged squared gradient by setting \(\beta_k = 1-1/k\). 
+    \(\nu^{(k+1)} = \beta_k \nu^{(k)} + (1-\beta_k) \hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\)
+    
+    Then,
+    \(\nu^{(k+1)} = (k+1)^{-1} \sum^k_{k^\\prime =0}\hat{g}^{(k)} 
+      \cdot  \hat{g}^{(k)}\),
+    
+    where \(\nu^{(k)}\) converges to a constant almost surely under certain 
+    conditions.
     
     Parameters
     ----------
@@ -324,11 +353,12 @@ class AveragedAdam(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting the state
+        resetting \(m, \nu \ \text{and}, \ k \), the exponential moving average of 
+        gradient, squared gradient, and iteration respectively
         """
+        self._momentum = None
         self._avg_grad_sq = None
         self._t = None
-        self._momentum = None
 
     def descent_direction(self, grad):
         if self._avg_grad_sq is None:
@@ -343,10 +373,10 @@ class AveragedAdam(StochasticGradientOptimizer):
             momentum = self._momentum
         
         momentum *= self._beta_1
-        momentum += (1.-self._beta_1)*grad
+        momentum += (1. - self._beta_1) * grad
         beta_2 = 1 - 1/t
         avg_grad_sq *= beta_2
-        avg_grad_sq += (1.-beta_2)*grad**2
+        avg_grad_sq += (1. - beta_2) * grad**2
         if self._component_wise:
             descent_dir = momentum / np.sqrt(self._jitter+avg_grad_sq)
         else:
@@ -355,10 +385,93 @@ class AveragedAdam(StochasticGradientOptimizer):
         self._avg_grad_sq = avg_grad_sq
         self._t = t
         return descent_dir
-        
+
+class Adagrad(StochasticGradientOptimizer):
+    """Adagrad optimization method (Duchi et al., 2011)
+    
+    Uses accumilated squared gradients to rescale the current stochastic
+    gradient:
+    \(\hat{g}^{(k+1)}/\sqrt{\sum^k_{k^\\prime} \hat{g}^{(k^\\prime)} 
+                            \cdot \hat{g}^{(k^\\prime)}}\)
+    
+    Parameters
+    -----------
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
+    """
+
+    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
+        self._jitter = jitter
+        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+
+    def reset_state(self):
+        """
+        \nu
+        """
+        self._sum_grad_sq = 0
+
+    def descent_direction(self, grad):
+        self._sum_grad_sq += grad**2
+        descent_dir = grad / np.sqrt(self._jitter + self._sum_grad_sq)
+        return descent_dir
+
+class WindowedAdagrad(StochasticGradientOptimizer):
+    """Windowed Adagrad optimization method (Default optimizer in Pymc3)
+    
+    Uses a running window (w) to get the mean squared gradient to rescale
+    the current stochastic gradient:
+    \(\hat{g}^{(k+1)}/\sqrt{\sum^k_{k^\\prime = k-w} \hat{g}^{(k^\\prime)} 
+                            \cdot \hat{g}^{(k^\\prime)}}\)
+    
+    Parameters
+    -----------
+    window size : `int` optional
+        Window size used to store the square of the gradients. The default is 10
+    jitter: `float` optional
+        Small value used for numerical stability. The default is 1e-8
+
+    Returns
+    ----------
+    descent_dir : `numpy.ndarray`, shape(var_param_dim,)
+        Descent direction of the optimization algorithm
+    """
+
+    def __init__(self, learning_rate, *, weight_decay=0, window_size=10, 
+                 jitter=1e-8, diagnostics=False):
+        self._window_size = window_size
+        self._jitter = jitter
+        super().__init__(learning_rate, weight_decay=weight_decay, 
+                         diagnostics=diagnostics)
+
+    def reset_state(self):
+        """
+        resetting the running squared gradients
+        """
+        self._history = []
+
+    def descent_direction(self, grad):
+        self._history.append(grad**2)
+        if len(self._history) > self._window_size:
+            self._history.pop(0)
+        mean_grad_squared = np.mean(self._history, axis=0)
+        descent_dir = grad / np.sqrt(self._jitter + mean_grad_squared)
+        return descent_dir
+
         
 class FASO(Optimizer):
     """Fixed-learning rate stochastic optimization meta-algorithm
+    
+    This algorithm runs stochastic optimization with a fixed-learning rate using 
+    a user specified optimization method. It determines the convergence at the 
+    fixed-learning rate using the potential scale reduction factor \(\hat{R}\) and 
+    combined with a Monte Carlo standard error cutoff.
+    
+    See more details: https://arxiv.org/pdf/2203.15945.pdf
 
     Parameters
     ----------
@@ -393,26 +506,17 @@ class FASO(Optimizer):
             raise ValueError('"ESS_min" must be greater than zero')
 
     def optimize(self, n_iters, objective, init_param):
-        dim = int(init_param.size/2)
         diagnostics = self._sgo._diagnostics
         k_conv = None  # Iteration number when reached convergence
         k_stopped = None  # Iteration number when MCSE/ESS conditions met
         k_Rhat = None  # Iteration number when R hat convergence criterion met
         learning_rate = self._sgo._learning_rate
         variational_param = init_param.copy()
-        variational_param_history = []
-        value_history = []
-        grad_history = []
-        descent_dir_history = []
-        ess_and_mcse_k_history = []
-        ess_history = []
-        mcse_history = []
-        iterate_average_k_history = []
-        iterate_average_history = []
+        history = defaultdict(list)
         iterate_average = variational_param.copy()
         if diagnostics:
-            iterate_average_k_history.append(0)
-            iterate_average_history.append(iterate_average)
+            history['iterate_average_k_history'].append(0)
+            history['iterate_average_history'].append(iterate_average)
         total_opt_time = 0  # total time spent on optimization
         with tqdm.trange(n_iters) as progress:
             try:
@@ -420,13 +524,13 @@ class FASO(Optimizer):
                     # take step in descent direction
                     with Timer() as opt_timer:
                         object_val, object_grad = objective(variational_param)
-                        value_history.append(object_val)
-                        grad_history.append(object_grad)
+                        history['value_history'].append(object_val)
+                        history['grad_history'].append(object_grad)
                         descent_dir = self._sgo.descent_direction(object_grad)
                         variational_param = objective.update(variational_param, learning_rate * descent_dir)
-                        variational_param_history.append(variational_param.copy())
+                        history['variational_param_history'].append(variational_param.copy())
                         if diagnostics:
-                            descent_dir_history.append(descent_dir)
+                            history['descent_dir_history'].append(descent_dir)
                     total_opt_time += opt_timer.interval
                     # If convergence has not been reached then check for
                     # convergence using R hat
@@ -435,11 +539,11 @@ class FASO(Optimizer):
                         if W_upper > self._W_min:
                             windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
                             R_hat_success, best_W = R_hat_convergence_check(
-                                variational_param_history, windows)
-                            iterate_average = np.mean(variational_param_history[-best_W:], axis=0)
+                                history['variational_param_history'], windows)
+                            iterate_average = np.mean(history['variational_param_history'][-best_W:], axis=0)
                             if diagnostics:
-                                iterate_average_k_history.append(k)
-                                iterate_average_history.append(iterate_average)
+                                history['iterate_average_k_history'].append(k)
+                                history['iterate_average_history'].append(iterate_average)
                             if R_hat_success:
                                 k_Rhat = k
                                 k_conv = k - best_W
@@ -448,14 +552,15 @@ class FASO(Optimizer):
                     # Once convergence has been reached compute the MCSE
                     if k_conv is not None and k - k_conv == W_check:
                         W = W_check
-                        converged_iterates = np.array(variational_param_history[-W:])
+                        converged_iterates = np.array(history['variational_param_history'][-W:])
                         iterate_average = np.mean(converged_iterates, axis=0)
-                        if diagnostics and k not in iterate_average_k_history:
-                            iterate_average_k_history.append(k)
-                            iterate_average_history.append(iterate_average)
+                        if diagnostics and k not in history['iterate_average_k_history']:
+                            history['iterate_average_k_history'].append(k)
+                            history['iterate_average_history'].append(iterate_average)
                         # compute MCSE
                         with Timer() as mcse_timer:
                             if isinstance(objective.approx, MFGaussian):
+                                dim = int(init_param.size/2)
                                 # For MF Gaussian, use MCSE(mu/sigma,log_sigma)
                                 iterate_diff = (converged_iterates[W - 2, :]
                                                 - converged_iterates[W - 1, :])
@@ -473,9 +578,9 @@ class FASO(Optimizer):
                             else:
                                 ess, mcse = MCSE(converged_iterates)
                         if diagnostics:
-                            ess_and_mcse_k_history.append(k)
-                            ess_history.append(ess)
-                            mcse_history.append(mcse)
+                            history['ess_and_mcse_k_history'].append(k)
+                            history['ess_history'].append(ess)
+                            history['mcse_history'].append(mcse)
                         if (np.max(mcse) < self._mcse_threshold and np.min(ess) > self._ESS_min):
                             k_stopped = k
                             break
@@ -486,7 +591,7 @@ class FASO(Optimizer):
                             recheck_scale = max(1.05, 1 + 1 / np.sqrt(1 + relative_time_ratio))
                             W_check = int(recheck_scale * W_check + 1)
                     if k % self._k_check == 0:
-                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        avg_loss = np.mean(history['value_history'][max(0, k - 1000):k + 1])
                         R_conv = 'converged' if k_conv is not None else 'not converged'
                         progress.set_description(
                             'average loss = {:,.5g} | R hat {}|'.format(avg_loss, R_conv))
@@ -507,24 +612,25 @@ class FASO(Optimizer):
                 # print(ess)
         else:
             print('Convergence reached at iteration', k_stopped)
-        return dict(opt_param=iterate_average,
-                    k_conv=k_conv,
-                    k_Rhat=k_Rhat,
-                    k_stopped=k_stopped,
-                    variational_param_history=np.array(variational_param_history),
-                    value_history=np.array(value_history),
-                    grad_history = np.array(grad_history),
-                    iterate_average_k_history=np.array(iterate_average_k_history),
-                    iterate_average_history=np.array(iterate_average_history),
-                    descent_dir_history=np.array(descent_dir_history),
-                    ess_and_mcse_k_history=np.array(ess_and_mcse_k_history),
-                    ess_history=np.array(ess_history),
-                    mcse_history=np.array(mcse_history)
-                    )
-                    
+        results = {d: np.array(h) for d, h in history.items()}
+        results['k_conv'] = k_conv
+        results['k_Rhat'] = k_Rhat
+        results['k_stopped'] = k_stopped
+        results['opt_param'] = iterate_average
+        return results
 
 class RAABBVI(FASO):
     """A robust, automated, and accurate BBVI optimizer
+    
+    This algorithm combines the FASO algorithm with a termination rule to determine
+    the appropriate point where the algorithm could terminate. The termination rule is
+    based on the trade-off between improved accuracy of the variational approximation
+    if the current learning rate is reduced by an adaptation factor \(\rho\)  and 
+    the time required to reach that improved accuracy. If the improved accuracy
+    level is large compared to the runtime then this algorithm adaptively decrease
+    the learning rate and if not algorithm will be terminated.
+    
+    See more details: https://arxiv.org/pdf/2203.15945.pdf
 
     Parameters
     ----------
@@ -539,26 +645,23 @@ class RAABBVI(FASO):
         Absolute SKL accuracy threshold 
     inefficiency_threshold : `float`, optional
         Threshold for the inefficiency index.
-    save_weighted_reg_results : `Boolean`, optional
-        Indicate whether to save the samples of estimated parameters from weighted regression.
     init_rmpsprop : `Boolean`, optional
         Indicate whether to run using RMSProp optimization method for the initial learning rate
     **kwargs:
         Keyword arguments for `FASO`
     """
     def __init__(self, sgo, *, rho=0.5, iters0=1000, accuracy_threshold=0.1, inefficiency_threshold=1.0,
-                 save_weighted_reg_results=False, init_rmsprop=False, **kwargs):
+                 init_rmsprop=False, **kwargs):
         super().__init__(sgo, **kwargs)
         self._iters0 = iters0
         self._rho = rho
-        self._accuracy_threshold=accuracy_threshold
-        self._inefficiency_threshold=inefficiency_threshold
-        self._save_weighted_reg_results = save_weighted_reg_results
+        self._accuracy_threshold = accuracy_threshold
+        self._inefficiency_threshold = inefficiency_threshold
         self._init_rmsprop = init_rmsprop
         if rho < 0 or rho > 1:
             raise ValueError('"rho" must be between zero and one')
 
-    def weighted_linear_regression(self, model, y, x, s=9, a=0.25, n_chains=4, results=False):
+    def weighted_linear_regression(self, model, y, x, s=9, a=0.25, n_chains=4):
         """
         weighted regression with likelihood term having the weight
         Parameters
@@ -575,8 +678,6 @@ class RAABBVI(FASO):
             Power of the weight parameter. The default is 1/4.
         n_chains: `int`, optional
             Number of sampling chains. The default is 4.
-        results : `Boolean`, optional
-            Return the fit object in pystan. The default is False.
             
         Returns
         -------
@@ -608,10 +709,8 @@ class RAABBVI(FASO):
             kappa = np.mean(fit['kappa'])
         log_c = np.mean(fit['log_c'])
         c = np.exp(log_c)
-        if results:
-            return fit, kappa, c
-        else:
-            return kappa, c
+        return fit, kappa, c
+        
     
     def wls(self, x, y, s=9, a=0.25):
         """
@@ -692,114 +791,56 @@ class RAABBVI(FASO):
         else:
             reg_model = StanModel_cache(model_name='weighted_lin_regression')
         iterate_average_curr = init_param.copy()
-        iterate_average_curr_hist = [iterate_average_curr]
-        variational_param_history = None
-        value_history = None
-        grad_history = None
-        descent_dir_history = None
-        iterate_average_k_history = None
-        iterate_average_history = None
-        ess_and_mcse_k_history = None
-        ess_history = None
-        mcse_history = None
-        final_mcse_history = []
-        SKL_history = []
-        learning_rate_hist = []
-        kappa_hist = []
-        c_hist = []
-        c_sample_hist = []
-        kappa_sample_hist = []
-        k_new_hist = [0]
-        k_conv_hist = []
-        k_Rhat_hist = []
+        history = defaultdict(list)
+        history['iterate_average_curr_hist'].append(iterate_average_curr)
+        history['k_mcse'].append(0)
         stopped = False
-        convg_iters_hist = []
-        predicted_iters_hist = []
-        stopping_crt = []
-        k_stopped_final_hist = []
-        LR = [] #learning rate for WLS regression 
-        CI = [] #Converged Iterations for WLS regression
         try:
             while not stopped:
-                K_max -= (k_new +1)
+                K_max -= (k_new + 1)
                 iterate_average_prev = iterate_average_curr
-                if k==0 and self._init_rmsprop:
+                if k == 0 and self._init_rmsprop: #Using RMSProp optimization initially if specified
                     rmsprop = RMSProp(learning_rate=sgo._learning_rate, diagnostics=diagnostics)
                     faso = FASO(sgo = rmsprop)
                     opt = faso.optimize(K_max, objective, iterate_average_curr)
                 else:
                     opt = super().optimize(K_max, objective, iterate_average_curr)
-                if opt['k_stopped'] is not None and k!=0: #removing the number of convergence iterations of initial learning rate
+                if opt['k_stopped'] is not None and k != 0: #removing the number of convergence iterations of initial learning rate
                     convg_iters = opt['k_stopped']
-                    convg_iters_hist.append(convg_iters)
-                    CI.append(convg_iters)
+                    history['conv_iters_hist'].append(convg_iters)
+                    # CI.append(convg_iters)
                 iterate_average_curr = opt['opt_param']
-                iterate_average_curr_hist.append(iterate_average_curr)
+                history['iterate_average_curr_hist'].append(iterate_average_curr)
                 k_new = opt['k_stopped']
                 
-                if opt['k_Rhat'] is not None and k_new is not None:
-                    k_Rhat_hist.append(opt['k_Rhat']+k_add)
-                else:
-                    k_Rhat_hist.append(opt['k_Rhat'])
+                history['k_Rhat'].append(opt['k_Rhat'] + k_add if opt['k_Rhat'] is not None and k_new is not None else opt['k_Rhat'])   
+                history['k_conv'].append(opt['k_conv'] + k_add if opt['k_conv'] is not None and k_new is not None else opt['k_conv'])
+                history['k_mcse'].append(k_new + k_add if k_new is not None else k_new)   
+                history['variational_param_history'].extend(opt['variational_param_history'])
+                history['value_history'].extend(opt['value_history'])
+                history['grad_history'].extend(opt['grad_history'])
+                
+                #if user require diagnostics
+                if diagnostics: 
+                    history['descent_dir_history'].extend(opt['descent_dir_history'])
+                    #checking convergence detection to store computed MCSE and ESS
+                    if opt['k_conv'] is not None: 
+                        history['ess_history'].extend(opt['ess_history'])
+                        history['mcse_history'].extend(opt['mcse_history'])
+                        if len(history['mcse_history']) > 0:
+                            history['final_mcse_history'].append(history['mcse_history'][-1])
+                        else:
+                             history['final_mcse_history'].append(history['mcse_history'])
+                    #saving the iteration histories at the initial learning rate
+                    if k == 0: 
+                        history['iterate_average_k_history'].extend(opt['iterate_average_k_history'])
+                        history['iterate_average_history'].extend(opt['iterate_average_history'])
+                    else: #adding previous number of iterations to the current iterations 
+                        history['iterate_average_k_history'].extend(opt['iterate_average_k_history'][1:] + k_add)
+                        history['iterate_average_history'].extend(opt['iterate_average_history'][1:,:])
+               
+                k_add = history['iterate_average_k_history'][-1]
                     
-                if opt['k_conv'] is not None and k_new is not None:
-                    k_conv_hist.append(opt['k_conv']+k_add)
-                else:
-                    k_conv_hist.append(opt['k_conv'])
-                
-                if k_new is not None:
-                    k_new_hist.append(k_new+k_add)   
-                else:
-                    k_new_hist.append(k_new)
-                    #k_conv_hist.append(opt['k_conv'])
-                if k == 0:
-                    variational_param_history = opt['variational_param_history']
-                    value_history = opt['value_history']
-                    grad_history = opt['grad_history']
-                    if diagnostics:
-                        descent_dir_history = opt['descent_dir_history']
-                        iterate_average_k_history = opt['iterate_average_k_history']
-                        iterate_average_history = opt['iterate_average_history']
-                        ess_and_mcse_k_history = opt['ess_and_mcse_k_history']
-                        ess_history = opt['ess_history']
-                        mcse_history = opt['mcse_history']
-                        if len(mcse_history)>0:
-                            final_mcse_history.append(mcse_history[-1])
-                        else:
-                            final_mcse_history.append(mcse_history)
-                    k_add = iterate_average_k_history[-1]
-                else:
-                    variational_param_history = np.concatenate(
-                        (variational_param_history,
-                         opt['variational_param_history']))
-                    value_history = np.concatenate((value_history,
-                                                    opt['value_history']))
-                    grad_history = np.concatenate((grad_history,
-                                                   opt['grad_history']))
-                    if diagnostics:
-                        descent_dir_history = np.concatenate(
-                            (descent_dir_history,opt['descent_dir_history']))
-                        iterate_average_k_history = np.concatenate(
-                            (iterate_average_k_history,
-                             opt['iterate_average_k_history'][1:] + k_add))
-                        iterate_average_history = np.concatenate(
-                            (iterate_average_history,
-                             opt['iterate_average_history'][1:,:]))
-                    k_add = iterate_average_k_history[-1]
-                    if diagnostics and k_new is not None:
-                        ess_and_mcse_k_history = np.concatenate(
-                            (ess_and_mcse_k_history,
-                             opt['ess_and_mcse_k_history']+ k_add))
-                        ess_history = np.concatenate((ess_history,
-                                                      opt['ess_history']))
-                        mcse_history = np.concatenate((mcse_history,
-                                                      opt['mcse_history']))
-                        if len(mcse_history)>0:
-                            final_mcse_history.append(mcse_history[-1])
-                        else:
-                            final_mcse_history.append(mcse_history)
-                #k_add = iterate_average_k_history[-1]
-                
                 if k_new is None:  # maximum number of iterations reached
                     break
                 else: #compute the stopping criteria
@@ -808,84 +849,69 @@ class RAABBVI(FASO):
                     self._mcse_threshold *= self._rho
                     if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
                         self._sgo.reset_state()
-                    if len(learning_rate_hist) > 0:
+                    if len(history['learning_rate_hist']) > 0:
                         SKL = (objective.approx.kl(iterate_average_prev, iterate_average_curr) +
                                objective.approx.kl(iterate_average_curr, iterate_average_prev))
-                        SKL_history.append(SKL)
+                        history['SKL_history'].append(SKL)
                         
                         # Conduct weighted linear regression to estimate parameters
                         # of SKL hat
-                        if len(SKL_history) > 0:
-                            y = np.log(SKL_history)
-                            x = np.log(learning_rate_hist)
-                            if self._save_weighted_reg_results:
-                                fit, kappa, c = self.weighted_linear_regression(reg_model, y, x,results=True)
-                                c_sample_hist.append(np.exp(fit['log_c']))
-                                if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
-                                    kappa_sample_hist = None
+                        if len(history['SKL_history']) > 0:
+                            y_wlr = np.log(history['SKL_history'])
+                            x_wlr = np.log(history['learning_rate_hist'])
+                            fit, kappa, c = self.weighted_linear_regression(reg_model, y_wlr, x_wlr)
+                            if diagnostics:
+                                history['c_sample_hist'].append(np.exp(fit['log_c']))
+                                if isinstance(self._sgo, AveragedRMSProp) or \
+                                    isinstance(self._sgo, AveragedAdam):
+                                    history['kappa_sample_hist'] = None
                                 else:
-                                    kappa_sample_hist.append(fit['kappa'])
-                            else:
-                                kappa, c = self.weighted_linear_regression(reg_model, y, x)
-                            kappa_hist.append(kappa)
-                            c_hist.append(c)
-                            #computing the stopping rule criteria 
-                            if len(learning_rate_hist) >1:
-                                relative_skl = (self._rho)**kappa + (self._accuracy_threshold/(np.sqrt(c)*learning_rate_hist[-1]**kappa))
-                                curr_iters = convg_iters_hist[-1]
-                                _, slope = self.wls(np.log(LR), np.log(CI))
+                                    history['kappa_sample_hist'].append(fit['kappa'])
+                            history['kappa_hist'].append(kappa)
+                            history['c_hist'].append(c)
+                            #computing the termination rule criteria 
+                            if len(history['learning_rate_hist']) > 1:
+                                relative_skl = (self._rho)**kappa + \
+                                (self._accuracy_threshold/(np.sqrt(c) *
+                                       history['learning_rate_hist'][-1]**kappa))
+                                curr_iters = history['conv_iters_hist'][-1]
+                                _, slope = self.wls(np.log(history['learning_rate_hist']),
+                                                    np.log(history['conv_iters_hist']))
                                 trend_check = self.convg_iteration_trend_detection(slope)
-                                if trend_check: #if relationship is negative procede
-                                    b0, b1 = self.wls(np.log(LR), np.log(CI))
-                                    pred_iters = int(np.exp(b0)*(self._rho*learning_rate_hist[-1])**b1)
-                                    predicted_iters_hist.append(pred_iters)
-                                else: 
-                                    LR.pop(0) #removing points showing increasing trend
-                                    CI.pop(0) #removing points showing increasing trend
-                                    pred_iters = curr_iters 
-                                    predicted_iters_hist.append(pred_iters)
+                                if trend_check: #if negative relationship use all observations
+                                    y_wls = history['conv_iters_hist']
+                                    x_wls = history['learning_rate_hist']   
+                                else: #remove the initial observation
+                                    y_wls = history['conv_iters_hist'][1:]
+                                    x_wls = history['learning_rate_hist'][1:]
+                                b0, b1 = self.wls(np.log(x_wls), np.log(y_wls))
+                                pred_iters = int(np.exp(b0) * \
+                                        (self._rho * history['learning_rate_hist'][-1])**b1)
+                                history['predicted_iters_hist'].append(pred_iters)
                                 relative_iters = pred_iters/(curr_iters + self._iters0)
-                                stopping_crt.append(relative_skl*relative_iters)
-                                if relative_skl*relative_iters > self._inefficiency_threshold:
+                                history['stopping_crt'].append(relative_skl * relative_iters)
+                                #checking whether termination rule condition satisfied
+                                if relative_skl * relative_iters > self._inefficiency_threshold:
                                     stopped = True
                                     k_stopped_final = k_total
-                                    k_stopped_final_hist.append(k_total)
+                                    history['k_stopped_final_hist'].append(k_total)
                                     break 
                                 
-                    learning_rate_hist.append(sgo._learning_rate)
-                    LR.append(sgo._learning_rate)
+                    history['learning_rate_hist'].append(sgo._learning_rate)
+                    # LR.append(sgo._learning_rate)
                 k += 1
         except (KeyboardInterrupt, StopIteration) as e:  # pragma: no cover
             pass
         if stopped:
-            print('Stopping rule reached at iteration', k_total)
-            print('Stopping criteria', relative_skl*relative_iters)
+            print('Termination rule reached at iteration', k_total)
+            print('Inefficiency Index:', relative_skl * relative_iters)
         else:
             print('WARNING: maximum number of iterations reached before '
                   'stopping rule was triggered')
-        return dict(opt_param = iterate_average_curr,
-                    k_mcse = k_new_hist,
-                    k_conv = k_conv_hist,
-                    k_Rhat = k_Rhat_hist,
-                    conv_iters_hist = convg_iters_hist,
-                    predicted_iters_hist = predicted_iters_hist,
-                    learning_rate_hist = learning_rate_hist,
-                    variational_param_history = np.array(variational_param_history),
-                    value_history = np.array(value_history),
-                    grad_history = np.array(grad_history),
-                    descent_dir_history = np.array(descent_dir_history),
-                    iterate_average_k_history = np.array(iterate_average_k_history),
-                    iterate_average_history = np.array(iterate_average_history),
-                    iterate_average_curr_hist = np.array(iterate_average_curr_hist),
-                    ess_and_mcse_k_history = np.array(ess_and_mcse_k_history),
-                    final_mcse_history = final_mcse_history,
-                    ess_history = np.array(ess_history),
-                    mcse_history = np.array(mcse_history),
-                    SKL_history = np.array(SKL_history),
-                    kappa_hist = np.array(kappa_hist),
-                    c_hist = np.array(c_hist),
-                    kappa_sample_hist = np.array(kappa_sample_hist),
-                    c_sample_hist = np.array(c_sample_hist),
-                    k_stopped_final = k_stopped_final,
-                    k_stopped_final_hist = k_stopped_final_hist,
-                    stopping_crt = stopping_crt)
+        results = {d: np.array(h) for d, h in history.items() if d!='k_Rhat' and d!='k_mcse' and d!='k_conv' }
+        results['opt_param'] = iterate_average_curr
+        results['k_stopped_final'] = k_stopped_final
+        results['k_Rhat'] = history['k_Rhat']; results['k_mcse'] = history['k_mcse']
+        results['k_conv'] = history['k_conv']
+        return results
+        

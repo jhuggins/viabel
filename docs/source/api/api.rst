@@ -67,6 +67,7 @@ Optimization
 
    Optimizer
    StochasticGradientOptimizer
+   Adam
    RMSProp
    Adagrad
    WindowedAdagrad

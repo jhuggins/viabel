@@ -4,7 +4,7 @@ import pytest
 from autograd import grad
 
 from viabel.optimization import (
-    RAABBVI, FASO, Adagrad, RMSProp, 
+    RAABBVI, FASO, Adagrad, RMSProp, Adam,
     AveragedAdam, AveragedRMSProp,
     StochasticGradientOptimizer, WindowedAdagrad)
 
@@ -62,6 +62,12 @@ def test_rmsprop_optimize():
         sgd = RMSProp(0.01)
         _test_optimizer(sgd, objective, true_value, 20000)
 
+def test_adam_optimize():
+    for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
+        true_value = np.arange(scales.size)
+        objective = DummyObjective(true_value, noise=.2, scales=scales)
+        sgd = Adam(0.01)
+        _test_optimizer(sgd, objective, true_value, 20000)
 
 def test_adagrad_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
