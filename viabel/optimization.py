@@ -149,12 +149,15 @@ class StochasticGradientOptimizer(Optimizer):
 class RMSProp(StochasticGradientOptimizer):
     """RMSProp optimization method (Hinton and Tieleman, 2012)
     
-    Tracks the exponential moving average of squared gradient. 
-    \(\nu^{(k+1)} = \beta \nu^{(k)} + (1-\beta) \hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\)
+    Tracks the exponential moving average of squared gradient:
     
-    Uses \(\nu^{(k)}\) to rescale the current stochastic gradient: 
-        \(\hat{g}^{(k+1)}/\sqrt{\nu^{(k)}}\).
+    .. math::
+        \\nu^{(k+1)} = \\beta \\nu^{(k)} + (1-\\beta) \\hat{g}^{(k)} \\cdot  \\hat{g}^{(k)}
+    
+    and uses :math:`\\nu^{(k)}` to rescale the current stochastic gradient:
+        
+    .. math::
+        \\hat{g}^{(k+1)}/\\sqrt{\\nu^{(k)}}.
     
     Parameters
     -----------
@@ -179,7 +182,7 @@ class RMSProp(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting \(\nu\), the exponential moving average of squared gradient
+        resetting :math:`\\nu`, the exponential moving average of squared gradient
         """
         self._avg_grad_sq = None
 
@@ -198,15 +201,17 @@ class RMSProp(StochasticGradientOptimizer):
 class AveragedRMSProp(StochasticGradientOptimizer):
     """Averaged RMSProp optimization method (Mukkamala and Hein, 2017, §4)
     
-    Uses averaged squared gradient by setting \(\beta_k = 1-1/k\). 
-    \(\nu^{(k+1)} = \beta_k \nu^{(k)} + (1-\beta_k) \hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\)
+    Uses averaged squared gradient by setting :math:`\\beta_k = 1-1/k` such that 
+    
+    .. math::
+        \\nu^{(k+1)} = \\beta_k \\nu^{(k)} + (1-\\beta_k) \\hat{g}^{(k)} \\cdot  \\hat{g}^{(k)}.
     
     Then,
-    \(\nu^{(k+1)} = (k+1)^{-1} \sum^k_{k^\\prime =0}\hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\),
     
-    where \(\nu^{(k)}\) converges to a constant almost surely under certain 
+    .. math::
+        \\nu^{(k+1)} = (k+1)^{-1} \\sum^k_{k^\\prime =0}\\hat{g}^{(k)} \\cdot  \\hat{g}^{(k)},
+    
+    where :math:`\\nu^{(k)}` converges to a constant almost surely under certain 
     conditions.
     
     Parameters
@@ -229,7 +234,7 @@ class AveragedRMSProp(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting \(\nu\) and k, the exponential moving average of squared 
+        resetting :math:`\\nu` and k, the exponential moving average of squared 
         gradient and iteration respectively
         """
         self._avg_grad_sq = None
@@ -257,13 +262,17 @@ class Adam(StochasticGradientOptimizer):
     """Adam optimization method (Kingma and Ba, 2015)
     
     Tracks exponential moving average of the gradient as well as the 
-    squared gradient 
-    \(m^{(k+1)} = \beta_1 m^{(k)} + (1-\beta_1) \hat{g}^{(k)}\)
-    \(\nu^{(k+1)} = \beta_2 \nu^{(k)} + (1-\beta_2) \hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\)
+    squared gradient: 
     
-    Uses \(m^{(k)}, \nu^{(k)}\) to rescale the current stochastic gradient: 
-        \(m^{(k)}}/\sqrt{\nu^{(k)}}\).
+    .. math::    
+        m^{(k+1)} &= \\beta_1 m^{(k)} + (1-\\beta_1) \\hat{g}^{(k)}\\\\
+        \\nu^{(k+1)} &= \\beta_2 \\nu^{(k)} + (1-\\beta_2) \\hat{g}^{(k)} \\cdot \\hat{g}^{(k)}
+    
+    
+    and uses :math:`m^{(k)}` and  :math:`\\nu^{(k)}` to rescale the current stochastic gradient:
+    
+    .. math::    
+        m^{(k)}/\\sqrt{\\nu^{(k)}}.
         
     Parameters
     ----------
@@ -290,7 +299,7 @@ class Adam(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting \(m \ \text{and} \ \nu\), the exponential moving average of 
+        resetting m and  :math:`\\nu`, the exponential moving average of 
         gradient and squared gradient respectively
         """
         self._momentum = None
@@ -319,15 +328,15 @@ class Adam(StochasticGradientOptimizer):
 class AveragedAdam(StochasticGradientOptimizer):
     """Averaged Adam optimization method (Mukkamala and Hein, 2017, §4)
     
-    Uses averaged squared gradient by setting \(\beta_k = 1-1/k\). 
-    \(\nu^{(k+1)} = \beta_k \nu^{(k)} + (1-\beta_k) \hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\)
+    Uses averaged squared gradient by setting :math:`\\beta_k = 1-1/k` such that
     
+    .. math::    
+        \\nu^{(k+1)} = \\beta_k \\nu^{(k)} + (1-\\beta_k) \\hat{g}^{(k)} \\cdot \\hat{g}^{(k)}.
     Then,
-    \(\nu^{(k+1)} = (k+1)^{-1} \sum^k_{k^\\prime =0}\hat{g}^{(k)} 
-      \cdot  \hat{g}^{(k)}\),
     
-    where \(\nu^{(k)}\) converges to a constant almost surely under certain 
+    .. math::   
+        \\nu^{(k+1)} = (k+1)^{-1} \\sum^k_{k^\\prime =0}\\hat{g}^{(k)} \\cdot  \\hat{g}^{(k)},
+    where :math:`\\nu^{(k)}` converges to a constant almost surely under certain 
     conditions.
     
     Parameters
@@ -353,7 +362,7 @@ class AveragedAdam(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        resetting \(m, \nu \ \text{and}, \ k \), the exponential moving average of 
+        resetting m, :math:`\\nu` and, k, the exponential moving average of 
         gradient, squared gradient, and iteration respectively
         """
         self._momentum = None
@@ -390,9 +399,10 @@ class Adagrad(StochasticGradientOptimizer):
     """Adagrad optimization method (Duchi et al., 2011)
     
     Uses accumilated squared gradients to rescale the current stochastic
-    gradient:
-    \(\hat{g}^{(k+1)}/\sqrt{\sum^k_{k^\\prime} \hat{g}^{(k^\\prime)} 
-                            \cdot \hat{g}^{(k^\\prime)}}\)
+    gradient:   
+        
+    .. math::   
+        \\frac{\\hat{g}^{(k+1)}}{\\sqrt{\\sum^k_{k^\\prime} \\hat{g}^{(k^\\prime)} \\cdot \\hat{g}^{(k^\\prime)}}}
     
     Parameters
     -----------
@@ -411,7 +421,7 @@ class Adagrad(StochasticGradientOptimizer):
 
     def reset_state(self):
         """
-        \nu
+        restting accumilated squared gradient
         """
         self._sum_grad_sq = 0
 
@@ -425,8 +435,9 @@ class WindowedAdagrad(StochasticGradientOptimizer):
     
     Uses a running window (w) to get the mean squared gradient to rescale
     the current stochastic gradient:
-    \(\hat{g}^{(k+1)}/\sqrt{\sum^k_{k^\\prime = k-w} \hat{g}^{(k^\\prime)} 
-                            \cdot \hat{g}^{(k^\\prime)}}\)
+        
+    .. math::
+        \\frac{\\hat{g}^{(k+1)}}{\\sqrt{\\sum^k_{k^\\prime = k-w} \\hat{g}^{(k^\\prime)} \\cdot \\hat{g}^{(k^\\prime)}}}
     
     Parameters
     -----------
@@ -464,7 +475,7 @@ class WindowedAdagrad(StochasticGradientOptimizer):
 
         
 class FASO(Optimizer):
-    """Fixed-learning rate stochastic optimization meta-algorithm
+    """Fixed-learning rate stochastic optimization meta-algorithm (FASO)
     
     This algorithm runs stochastic optimization with a fixed-learning rate using 
     a user specified optimization method. It determines the convergence at the 
@@ -620,12 +631,12 @@ class FASO(Optimizer):
         return results
 
 class RAABBVI(FASO):
-    """A robust, automated, and accurate BBVI optimizer
+    """A robust, automated, and accurate BBVI optimizer (RAABBVI)
     
     This algorithm combines the FASO algorithm with a termination rule to determine
     the appropriate point where the algorithm could terminate. The termination rule is
     based on the trade-off between improved accuracy of the variational approximation
-    if the current learning rate is reduced by an adaptation factor \(\rho\)  and 
+    if the current learning rate is reduced by an adaptation factor :math:`\\rho \in (0,1)`  and 
     the time required to reach that improved accuracy. If the improved accuracy
     level is large compared to the runtime then this algorithm adaptively decrease
     the learning rate and if not algorithm will be terminated.
