@@ -80,12 +80,14 @@ class StochasticGradientOptimizer(Optimizer):
         """Reset internal state of the optimizer"""
         pass
 
-    def optimize(self, n_iters, objective, init_param):
+    def optimize(self, n_iters, objective, init_param, init_hamflow_model_param=None,
+                 init_hamflow_rho_param=None):
         variational_param = init_param.copy()
         iap = self._iterate_avg_prop
-        value_history = []
-        variational_param_history = []
-        descent_dir_history = []
+        results = defaultdict(list)
+        # value_history = []
+        # variational_param_history = []
+        # descent_dir_history = []
         with tqdm.trange(n_iters) as progress:
             try:
                 for k in progress:
@@ -97,15 +99,15 @@ class StochasticGradientOptimizer(Optimizer):
                     if variational_param.ndim == 2:
                         variational_param *= (1 - self._weight_decay)
                     # record state information
-                    value_history.append(object_val)
+                    results['value_history'].append(object_val)
                     if self._diagnostics or iap is not None:
-                        variational_param_history.append(variational_param.copy())
-                        if (iap is not None and len(variational_param_history) > iap * k):
-                            variational_param_history.pop(0)
+                        results['variational_param_history'].append(variational_param.copy())
+                        if (iap is not None and len(results['variational_param_history']) > iap * k):
+                            results['variational_param_history'].pop(0)
                     if self._diagnostics:
-                        descent_dir_history.append(descent_dir)
+                        results['descent_dir_history'].append(descent_dir)
                     if k % 10 == 0:
-                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        avg_loss = np.mean(results['value_history'][max(0, k - 1000):k + 1])
                         progress.set_description(
                             'average loss = {:,.5g}'.format(avg_loss))
             except (KeyboardInterrupt, StopIteration):  # pragma: no cover
@@ -113,20 +115,16 @@ class StochasticGradientOptimizer(Optimizer):
                 progress.close()
             finally:
                 progress.close()
-        results = dict(value_history=value_history)
-        variational_param_history = np.array(variational_param_history)
+        
         if iap is not None:
             window = max(1, int(k * iap))
-            opt_param = np.mean(variational_param_history[-window:], axis=0)
+            results['opt_param'] = np.mean(results['variational_param_history'][-window:], axis=0)
         else:
             results['opt_param'] = variational_param.copy()
-        if descent_dir_history is not None:
-            results['descent_dir_history'] = descent_dir_history
-        return dict(opt_param=opt_param,
-                    variational_param_history=variational_param_history,
-                    value_history=np.array(value_history),
-                    descent_dir_history=np.array(descent_dir_history),
-                    )
+        # if descent_dir_history is not None:
+        #     results['descent_dir_history'] = descent_dir_history
+        results_dict = {d: np.array(h) for d, h in results.items()}
+        return results_dict
 
     def descent_direction(self, grad):
         """Compute descent direction for optimization.
@@ -162,7 +160,7 @@ class RMSProp(StochasticGradientOptimizer):
     Parameters
     -----------
     beta : `float` optional
-        Hyper-parameter. The default is 0.9
+        Squared gradient moving average hyper parameter. The default is 0.9
     jitter: `float` optional
         Small value used for numerical stability. The default is 1e-8
 
@@ -173,11 +171,12 @@ class RMSProp(StochasticGradientOptimizer):
         
     """
 
-    def __init__(self, learning_rate, *, weight_decay=0, beta=0.9, jitter=1e-8,
-                 diagnostics=False):
+    def __init__(self, learning_rate, *, weight_decay=0, iterate_avg_prop=0.2, 
+                 beta=0.9, jitter=1e-8, diagnostics=False):
         self._beta = beta
         self._jitter = jitter
-        super().__init__(learning_rate, weight_decay=weight_decay, \
+        super().__init__(learning_rate, weight_decay=weight_decay,
+                         iterate_avg_prop=iterate_avg_prop, 
                          diagnostics=diagnostics)
 
     def reset_state(self):
@@ -276,26 +275,27 @@ class Adam(StochasticGradientOptimizer):
         
     Parameters
     ----------
-    beta_1 : `float` optional
-        hyper-parameter. The default is 0.9
-    beta_2 : `float` optional
-        hyper-parameter. The default is 0.999
+    beta1 : `float` optional
+        Gradient moving average hyper parameter. The default is 0.9
+    beta2 : `float` optional
+        Squared gradient moving average hyper parameter. The default is 0.999
     jitter: `float` optional
         Small value used for numerical stability. The default is 1e-8
     component_wise: `boolean` optional
-        Indication of  component wise discent direction computation
+        Indicator for component-wise normalization of discent direction
 
     Returns
     ----------
     descent_dir : `numpy.ndarray`, shape(var_param_dim,)
         Descent direction of the optimization algorithm
     """
-    def __init__(self, learning_rate, *, beta_1=0.9, beta_2=0.999, jitter=1e-8,
-                 diagnostics=False):
-        self._beta_1 = beta_1
-        self._beta_2 = beta_2
+    def __init__(self, learning_rate, *, beta1=0.9, beta2=0.999, jitter=1e-8,
+                 iterate_avg_prop=0.2, diagnostics=False):
+        self._beta1 = beta1
+        self._beta2 = beta2
         self._jitter = jitter
-        super().__init__(learning_rate, diagnostics=diagnostics)
+        super().__init__(learning_rate, iterate_avg_prop=iterate_avg_prop,
+                         diagnostics=diagnostics)
 
     def reset_state(self):
         """
@@ -316,10 +316,10 @@ class Adam(StochasticGradientOptimizer):
         else:
             momentum = self._momentum
         
-        momentum *= self._beta_1
-        momentum += (1. - self._beta_1) * grad
-        avg_grad_sq *= self._beta_2
-        avg_grad_sq += (1. - self._beta_2) * grad**2
+        momentum *= self._beta1
+        momentum += (1. - self._beta1) * grad
+        avg_grad_sq *= self._beta2
+        avg_grad_sq += (1. - self._beta2) * grad**2
         descent_dir = momentum / np.sqrt(self._jitter + avg_grad_sq)
         self._momentum = momentum
         self._avg_grad_sq = avg_grad_sq
@@ -341,21 +341,21 @@ class AveragedAdam(StochasticGradientOptimizer):
     
     Parameters
     ----------
-    beta_1 : `float` optional
-        hyper-parameter. The default is 0.9
+    beta1 : `float` optional
+        Gradient moving average hyper parameter. The default is 0.9
     jitter: `float` optional
         Small value used for numerical stability. The default is 1e-8
     component_wise: `boolean` optional
-        Indication of  component wise discent direction computation
+        Indicator for component-wise normalization of discent direction
 
     Returns
     ----------
     descent_dir : `numpy.ndarray`, shape(var_param_dim,)
         Descent direction of the optimization algorithm
     """
-    def __init__(self, learning_rate, *, beta_1=0.9, jitter=1e-8,
+    def __init__(self, learning_rate, *, beta1=0.9, jitter=1e-8,
                  diagnostics=False, component_wise=True):
-        self._beta_1 = beta_1
+        self._beta1 = beta1
         self._jitter = jitter
         self._component_wise = component_wise
         super().__init__(learning_rate, diagnostics=diagnostics)
@@ -381,11 +381,11 @@ class AveragedAdam(StochasticGradientOptimizer):
         else:
             momentum = self._momentum
         
-        momentum *= self._beta_1
-        momentum += (1. - self._beta_1) * grad
-        beta_2 = 1 - 1/t
-        avg_grad_sq *= beta_2
-        avg_grad_sq += (1. - beta_2) * grad**2
+        momentum *= self._beta1
+        momentum += (1. - self._beta1) * grad
+        beta2 = 1 - 1/t
+        avg_grad_sq *= beta2
+        avg_grad_sq += (1. - beta2) * grad**2
         if self._component_wise:
             descent_dir = momentum / np.sqrt(self._jitter+avg_grad_sq)
         else:
@@ -415,9 +415,11 @@ class Adagrad(StochasticGradientOptimizer):
         Descent direction of the optimization algorithm
     """
 
-    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, diagnostics=False):
+    def __init__(self, learning_rate, *, weight_decay=0, jitter=1e-8, 
+                 iterate_avg_prop=0.2, diagnostics=False):
         self._jitter = jitter
-        super().__init__(learning_rate, weight_decay=weight_decay, diagnostics=diagnostics)
+        super().__init__(learning_rate, weight_decay=weight_decay, 
+                         iterate_avg_prop=iterate_avg_prop, diagnostics=diagnostics)
 
     def reset_state(self):
         """
@@ -824,7 +826,9 @@ class RAABBVI(FASO):
                 history['iterate_average_curr_hist'].append(iterate_average_curr)
                 k_new = opt['k_stopped']
                 
-                history['k_Rhat'].append(opt['k_Rhat'] + k_add if opt['k_Rhat'] is not None and k_new is not None else opt['k_Rhat'])   
+                # checking whether R hat convergence criteria reached and the FASO stopping criteria reached to add new number of iterations
+                history['k_Rhat'].append(opt['k_Rhat'] + k_add if opt['k_Rhat'] is not None and k_new is not None else opt['k_Rhat']) 
+                #checking whether R hat convergence criteria and the FASO stopping criteria reached to add new number of iterations
                 history['k_conv'].append(opt['k_conv'] + k_add if opt['k_conv'] is not None and k_new is not None else opt['k_conv'])
                 history['k_mcse'].append(k_new + k_add if k_new is not None else k_new)   
                 history['variational_param_history'].extend(opt['variational_param_history'])
