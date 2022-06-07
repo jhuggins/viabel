@@ -38,7 +38,7 @@ class Timer:
 
 def _data_file_path(filename):
     """Returns the path to an internal file"""
-    return os.path.abspath(os.path.join(__file__, '../data', filename))
+    return os.path.abspath(os.path.join(__file__, '../stan_models', filename))
 
 
 def _stan_model_cache_dir():
