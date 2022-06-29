@@ -27,7 +27,7 @@ get the most up-to-date version.
 
 ## Citing VIABEL
 
-If you use this package, please cite:
+If you use this package for diagnostics, please cite:
 
 [Validated Variational Inference via Practical Posterior Error Bounds](https://arxiv.org/abs/1910.04102).
 Jonathan H. Huggins,
@@ -44,5 +44,24 @@ The equivalent BibTeX entry is:
   title = {{Validated Variational Inference via Practical Posterior Error Bounds}},
   booktitle = {Proc. of the 23rd International Conference on Artificial Intelligence and Statistics (AISTATS)},
   year = {2020}
+}
+```
+
+If you use this package for variational inference, please cite:
+
+[Robust, Automated, and Accurate Black-box Variational Inference](https://arxiv.org/abs/2203.15945).
+Manushi Welandawe,
+Michael Riis Andersen,
+Aki Vehtari,
+Jonathan H. Huggins.
+arXiv preprint arXiv:2203.15945 (2022).
+
+The equivalent BibTeX entry is:
+```
+@article{Welandawe:2022:BBVI,
+  author={Welandawe, Manushi and Andersen, Michael Riis and Vehtari, Aki and Huggins, Jonathan H},
+  title={Robust, Automated, and Accurate Black-box Variational Inference},
+  journal={arXiv preprint arXiv:2203.15945},
+  year={2022}
 }
 ```
