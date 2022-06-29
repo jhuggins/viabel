@@ -54,14 +54,15 @@ Manushi Welandawe,
 Michael Riis Andersen,
 Aki Vehtari,
 Jonathan H. Huggins.
-arXiv preprint arXiv:2203.15945 (2022).
+arXiv:2203.15945 [stat.ML] (2022).
 
 The equivalent BibTeX entry is:
 ```
 @article{Welandawe:2022:BBVI,
   author={Welandawe, Manushi and Andersen, Michael Riis and Vehtari, Aki and Huggins, Jonathan H},
   title={Robust, Automated, and Accurate Black-box Variational Inference},
-  journal={arXiv preprint arXiv:2203.15945},
+  journal={arXiv},
+  volume = {arXiv:2203.15945 [stat.ML]},
   year={2022}
 }
 ```
