@@ -3,7 +3,7 @@ from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import FASO, RMSProp
+from viabel.optimization import RAABBVI, FASO, RMSProp
 
 all = [
     'bbvi',
@@ -12,9 +12,9 @@ all = [
 
 
 def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
-         approx=None, objective=None, fit=None, adaptive=True,
+         approx=None, objective=None, fit=None, adaptive=True, fixed_lr=False,
          init_var_param=None, learning_rate=0.01,
-         RMS_kwargs=dict(), FASO_kwargs=dict()):
+         RMS_kwargs=dict(), FASO_kwargs=dict(), RAABBVI_kwargs=dict()):
     """Fit a model using black-box variational inference.
 
     Currently the objective is optimized using ``viabel.optimization.FASO``.
@@ -49,6 +49,8 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         Dictionary of keyword arguments to pass to ``RMSProp``.
     FASO_kwargs : `dict`, optional
          Dictionary of keyword arguments to pass to ``FASO``.
+    RAABBVI_kwargs : `dict`, optional
+         Dictionary of keyword arguments to pass to ``RAABBVI``.
 
     Returns
     -------
@@ -76,10 +78,12 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    base_opt = RMSProp(learning_rate, **RMS_kwargs)
-    if adaptive:
+    base_opt = RMSProp(learning_rate, diagnostics=True, **RMS_kwargs)
+    if adaptive and not fixed_lr:
+        opt = RAABBVI(base_opt, **RAABBVI_kwargs)
+    elif adaptive and fixed_lr:
         opt = FASO(base_opt, **FASO_kwargs)
-    else:
+    elif not adaptive and fixed_lr:
         opt = base_opt
     opt_results = opt.optimize(n_iters, objective, init_var_param)
     opt_results['objective'] = objective
