@@ -43,6 +43,8 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         Initial variational parameter.
     adaptive : `bool`, optional
         If ``True``, use ``FASO`` with ``RMSProp``. Otherwise use ``RMSProp``.
+    fixed_lr : `bool`, optional
+        If ``True``, use ``FASO`` with ``RMSProp`` or ``RMSProp``. Otherwise use ``RAABBVI``.
     learning_rate : `float`
         Tuning parameter that determines the step size.
     RMS_kwargs : `dict`, optional
@@ -85,6 +87,8 @@ def bbvi(dimension, *, n_iters=10000, num_mc_samples=10, log_density=None,
         opt = FASO(base_opt, **FASO_kwargs)
     elif not adaptive and fixed_lr:
         opt = base_opt
+    else:
+        raise ValueError('if fixed_lr is False, adaptive must be True')
     opt_results = opt.optimize(n_iters, objective, init_var_param)
     opt_results['objective'] = objective
     return opt_results
