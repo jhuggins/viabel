@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import autograd.numpy as np
 import autograd.numpy.random as npr
 import autograd.scipy.stats.multivariate_normal as mvn
+import autograd.scipy.stats.norm as norm
 import autograd.scipy.stats.t as t_dist
 from autograd import elementwise_grad
 from autograd.scipy.linalg import sqrtm
@@ -228,8 +229,11 @@ class MFGaussian(ApproximationFamily):
                            - 2 * log_stdev_diff - 1)
 
     def log_density(self, var_param, x):
+        if x.ndim == 1:
+            x = x[np.newaxis, :]
         param_dict = self._pattern.fold(var_param)
-        return mvn.logpdf(x, param_dict['mu'], np.diag(np.exp(2 * param_dict['log_sigma'])))
+        return np.sum(norm.logpdf(x, param_dict['mu'], 
+                                  np.exp(param_dict['log_sigma'])), axis=-1)
 
     def mean_and_cov(self, var_param):
         param_dict = self._pattern.fold(var_param)
