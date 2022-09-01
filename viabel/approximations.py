@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 import autograd.numpy as np
 import autograd.numpy.random as npr
-import autograd.scipy.stats.multivariate_normal as mvn
 import autograd.scipy.stats.norm as norm
 import autograd.scipy.stats.t as t_dist
 from autograd import elementwise_grad
@@ -548,3 +547,4 @@ class NVPFlow(ApproximationFamily):
 
     def supports_pth_moment(self, p):
         return False
+
