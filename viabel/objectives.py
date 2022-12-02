@@ -151,8 +151,9 @@ class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
 
     def __init__(self, approx, model, num_mc_samples, ess_target,
-                 temper_prior, temper_prior_params, use_resampling=True,
-                 num_resampling_batches=1, w_clip_threshold=10):
+                 temper_model, temper_model_sampler, temper_fn, temper_eps_init,
+                 use_resampling=True, num_resampling_batches=1, w_clip_threshold=10,
+                 pretrain_batch_size=100):
         """
         Parameters
         ----------
@@ -164,35 +165,54 @@ class DISInclusiveKL(StochasticVariationalObjective):
         ess_target: `int`
             The ess target to adjust epsilon (M in the paper). It is also the number of
             samples in resampling.
-        temper_prior: `Model` object
-            A prior distribution to temper the model. Typically multivariate normal.
-        temper_prior_params: `numpy.ndarray` object
-            Parameters for the temper prior. Typically mean 0 and variance 1.
+        temper_model: `Model` object
+            A distribution to temper the model. Typically multivariate normal.
+        temper_model_sampler: `function` or `None`
+            returns n samples from temper model. Need for pretrain.
+        temper_fn: `function`
+            a function maps (log_model_density, log_temper_model_density, eps) to a tempered density
+        temper_eps_init: `float`
+            The initial value of tempering parameter eps.
         use_resampling: `bool`
             Whether to use resampling.
         num_resampling_batches: `int`
             Number of resampling batches. The resampling batch is `max(1, ess_target / num_resampling_batches)`.
         w_clip_threshold: `float`
             The maximum weight.
+        pretrain_batch_size: `int`
+            The batch size for pretraining.
         """
         self._ess_target = ess_target
         self._w_clip_threshold = w_clip_threshold
         self._max_bisection_its = 50
-        self._max_eps = self._eps = 1
+        self._max_eps = self._eps = temper_eps_init
         self._use_resampling = use_resampling
         self._num_resampling_batches = num_resampling_batches
         self._resampling_batch_size = max(1, self._ess_target // num_resampling_batches)
         self._objective_step = 0
 
-        self._tempered_model_log_pdf = lambda eps, samples, log_p_unnormalized: (
-            eps * temper_prior.log_density(temper_prior_params, samples)
-            + (1 - eps) * log_p_unnormalized)
+        self._model = model
+        self._temper_model = temper_model
+        self._temper_model_sampler = temper_model_sampler
+        self._temper_fn = temper_fn
+
+        self._pretraining = False
+        self._pretrain_batch_size = pretrain_batch_size
         super().__init__(approx, model, num_mc_samples)
+
+    def pretrain(self):
+        """Run pretraining stage."""
+        self._pretraining = True
+
+    def regular_train(self):
+        """Run training stage."""
+        self._pretraining = False
 
     def _get_weights(self, eps, samples, log_p_unnormalized, log_q):
         """Calculates normalised importance sampling weights"""
-        logw = self._tempered_model_log_pdf(eps, samples, log_p_unnormalized) - log_q
+        logw = self._temper_fn(log_p_unnormalized, self._temper_model(samples), eps) - log_q
         max_logw = np.max(logw)
+        logw -= max_logw
         if max_logw == -np.inf:
             raise ValueError('All weights zero! '
                              + 'Suggests overflow in importance density.')
@@ -214,26 +234,26 @@ class DISInclusiveKL(StochasticVariationalObjective):
         Returns new epsilon value and corresponding ESS and normalised importance sampling weights.
         """
 
-        lower = 0.
-        upper = eps_guess
-        eps_guess = (lower + upper) / 2.
-        for i in range(self._max_bisection_its):
-            w = self._get_weights(eps_guess, samples, log_p_unnormalized, log_q)
-            ess = self._get_ess(w)
-            if ess > self._ess_target:
-                upper = eps_guess
-            else:
-                lower = eps_guess
+        if not self._pretraining:
+            lower = 0.
+            upper = eps_guess
             eps_guess = (lower + upper) / 2.
+            for i in range(self._max_bisection_its):
+                w = self._get_weights(eps_guess, samples, log_p_unnormalized, log_q)
+                ess = self._get_ess(w)
+                if ess > self._ess_target:
+                    upper = eps_guess
+                else:
+                    lower = eps_guess
+                eps_guess = (lower + upper) / 2.
+            # Consider returning extreme epsilon values if they are still endpoints
+            if lower == 0.:
+                eps_guess = 0.
+            if upper == self._max_eps:
+                eps_guess = self._max_eps
 
         w = self._get_weights(eps_guess, samples, log_p_unnormalized, log_q)
         ess = self._get_ess(w)
-
-        # Consider returning extreme epsilon values if they are still endpoints
-        if lower == 0.:
-            eps_guess = 0.
-        if upper == self._max_eps:
-            eps_guess = self._max_eps
 
         return eps_guess, ess, w
 
@@ -260,12 +280,21 @@ class DISInclusiveKL(StochasticVariationalObjective):
         approx = self.approx
 
         def variational_objective(var_param):
+            if self._pretraining:
+                samples = self._temper_model_sampler(self._pretrain_batch_size)
+                log_q = approx.log_density(var_param, getval(samples))
+                _, self._ess, _ = self._get_eps_and_weights(self._max_eps, samples, 0, log_q)
+                return np.mean(-log_q)
+
             if not self._use_resampling or self._objective_step % self._num_resampling_batches == 0:
                 self._state_samples = getval(approx.sample(var_param, self.num_mc_samples))
                 self._state_log_q = approx.log_density(var_param, self._state_samples)
                 self._state_log_p_unnormalized = self.model(self._state_samples)
 
-                self._eps, ess, w = self._get_eps_and_weights(
+                # TODO double check
+                self._state_log_p_unnormalized -= np.max(self._state_log_p_unnormalized)
+
+                self._eps, self._ess, w = self._get_eps_and_weights(
                     self._eps, self._state_samples, self._state_log_p_unnormalized, self._state_log_q)
                 self._state_w_clipped = self._clip_weights(w)
                 self._state_w_sum = np.sum(self._state_w_clipped)
@@ -274,7 +303,8 @@ class DISInclusiveKL(StochasticVariationalObjective):
             self._objective_step += 1
 
             if not self._use_resampling:
-                return -np.inner(getval(self._state_w_clipped), self._state_log_q) / self.num_mc_samples
+                return -np.inner(getval(self._state_w_clipped),
+                                 self._state_log_q) / self.num_mc_samples
             else:
                 indices = np.random.choice(self.num_mc_samples,
                                            size=self._resampling_batch_size, p=getval(self._state_w_normalized))

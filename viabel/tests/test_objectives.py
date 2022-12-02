@@ -1,5 +1,6 @@
 import autograd.numpy as anp
 import numpy as np
+import scipy.stats
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
@@ -37,12 +38,19 @@ def test_ExclusiveKL():
 def test_ExclusiveKL_path_deriv():
     _test_objective(ExclusiveKL, 100, use_path_deriv=True)
 
+    # def __init__(self, approx, model, num_mc_samples, ess_target,
+    #              temper_model, temper_model_sampler, temper_fn, temper_eps_init,
+    #              use_resampling=True, num_resampling_batches=1, w_clip_threshold=10,
+    #              pretrain_batch_size=100):
 
 def test_DISInclusiveKL():
     dim = 2
+
     _test_objective(DISInclusiveKL, 100,
-                    temper_prior=MFGaussian(dim),
-                    temper_prior_params=np.concatenate([[0] * dim, [1] * dim]),
+                    temper_model=scipy.stats.multivariate_normal(mean=[0]*dim, cov=np.diag([1]*dim)).logpdf,
+                    temper_model_sampler=lambda n: np.random.multivariate_normal([[0] * dim, [1] * dim], size=n),
+                    temper_fn=lambda model_logpdf, temper_logpdf, eps: temper_logpdf * eps + model_logpdf * (1 - eps),
+                    temper_eps_init=1,
                     ess_target=50)
 
 

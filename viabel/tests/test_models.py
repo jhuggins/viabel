@@ -2,8 +2,8 @@ import pickle
 
 import autograd.numpy as anp
 import numpy as np
-import pystan
 import pytest
+import stan
 from autograd.scipy.stats import norm
 from autograd.test_util import check_vjp
 
@@ -55,25 +55,24 @@ def test_Model():
 
 
 def test_StanModel():
-    compiled_model_file = 'robust_reg_model.pkl'
-    try:
-        with open(compiled_model_file, 'rb') as f:
-            regression_model = pickle.load(f)
-    except BaseException:  # pragma: no cover
-        regression_model = pystan.StanModel(model_code=test_model,
-                                            model_name='regression_model')
-        with open('robust_reg_model.pkl', 'wb') as f:
-            pickle.dump(regression_model, f)
     np.random.seed(5039)
     beta_gen = np.array([-2, 1])
     N = 25
     x = np.random.randn(N, 2).dot(np.array([[1, .75], [.75, 1]]))
     y_raw = x.dot(beta_gen) + np.random.standard_t(40, N)
     y = y_raw - np.mean(y_raw)
-
     data = dict(N=N, x=x, y=y, df=40)
-    fit = regression_model.sampling(data=data, iter=10, thin=1, chains=1)
-    model = models.StanModel(fit)
+
+    compiled_model_file = 'robust_reg_model.pkl'
+    try:
+        with open(compiled_model_file, 'rb') as f:
+            regression_model = pickle.load(f)
+    except BaseException:  # pragma: no cover
+        regression_model = stan.build(program_code=test_model, data=data)
+        with open('robust_reg_model.pkl', 'wb') as f:
+            pickle.dump(regression_model, f)
+
+    model = models.StanModel(regression_model)
 
     x = 4 * np.random.randn(10, 2)
     _test_model(model, x, False, dict(beta=x[0]))
