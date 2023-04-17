@@ -548,7 +548,13 @@ class NVPFlow(ApproximationFamily):
     def supports_pth_moment(self, p):
         return False
     
-    
+def _get_low_rank_mu_sigma_pattern(dim, k):
+    ms_pattern = PatternDict(free_default=True)
+    ms_pattern['mu'] = NumericVectorPattern(length=dim)
+    ms_pattern['log_sigma'] = NumericVectorPattern(length=dim)
+    ms_pattern['low_rank'] = NumericArrayPattern(shape=(dim, k))
+    return ms_pattern
+
 class LRGaussian(ApproximationFamily):
     """A low rank Gaussian approximation family."""
 
