@@ -144,3 +144,14 @@ def test_NVP():
             var_param1 = np.random.randn(approx.var_param_dim) / 100
             _test_family(approx, var_param0, var_param1, [])
     # TODO: check behavior in corner cases
+    
+
+def test_LRGaussian():
+    np.random.seed(1214)
+    k=1
+    for dim in [1, 3]:
+        approx =LRGaussian(dim,k)
+        for i in range(3):
+            var_param0 = np.random.randn(approx.var_param_dim)
+            var_param1 = np.random.randn(approx.var_param_dim)
+            _test_family(approx, var_param0, var_param1, [2, 4])
