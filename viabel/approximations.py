@@ -547,4 +547,121 @@ class NVPFlow(ApproximationFamily):
 
     def supports_pth_moment(self, p):
         return False
+    
+    
+class LRGaussian(ApproximationFamily):
+    """A low rank Gaussian approximation family."""
 
+    def __init__(self, dim, seed=1, k=0):
+        """Create multivariate Gaussian approximation family.
+
+        Parameters
+        ----------
+        dim : `int`
+            dimension of the underlying parameter space
+        k : 'int'
+            number of low rank
+        """
+        self._rs = npr.RandomState(seed)
+        self._pattern = _get_low_rank_mu_sigma_pattern(dim, k)
+        self._k = k
+        super().__init__(dim, self._pattern.flat_length(True), True, True)
+
+    def init_param(self):
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=np.ones(self.dim),
+                               low_rank=self._rs.randn(self.dim,self._k))
+        return self._pattern.flatten(init_param_dict)
+
+
+
+    def sample(self, var_param, n_samples, seed=None):
+        my_rs = self._rs if seed is None else npr.RandomState(seed)
+        param_dict = self._pattern.fold(var_param)
+        z = my_rs.randn(n_samples,self._k)
+        epsilon = my_rs.randn(n_samples, self.dim)
+        D_exp = np.exp(param_dict['log_sigma'])
+        B = param_dict['low_rank']
+
+        return param_dict['mu'] + np.dot(z,B.T) + D_exp * epsilon
+
+    def _entropy(self, var_param):
+        param_dict = self._pattern.fold(var_param)
+        B = param_dict['low_rank']
+        D_exp = np.exp(2 * param_dict['log_sigma'])
+        Sigma = np.diag(D_exp) + np.dot(B, B.T)
+        Sigma_det = np.linalg.det(Sigma)
+        return 0.5 * self.dim * ( np.log(2 * np.pi * np.e)) + 0.5 * np.log(Sigma_det)
+
+    def _kl(self, var_param0, var_param1):
+        param_dict0 = self._pattern.fold(var_param0)
+        param_dict1 = self._pattern.fold(var_param1)
+        mean_diff = param_dict0['mu'] - param_dict1['mu']
+
+        B0 = param_dict0['low_rank']
+        D0 = np.exp(2 * param_dict0['log_sigma'])
+        Sigma0 = np.diag(D0) + np.dot(B0, B0.T)
+        Sigma0_det = np.linalg.det(Sigma0)
+
+        B1 = param_dict1['low_rank']
+        D1 = np.exp(2 * param_dict1['log_sigma'])
+        D1_ma = np.diag(D1)
+        D1_inv = np.linalg.inv(D1_ma)
+        Sigma1 = D1_ma + np.dot(B1, B1.T)
+        Sigma1_det = np.linalg.det(Sigma1)
+
+        #By the Woodbury formula
+        D1_invB = np.dot(D1_inv, B1)
+        I_BDB_inv = np.linalg.inv(np.eye(self._k) + np.dot(B1.T, D1_invB))
+        Sigma_inv = D1_inv - D1_invB @ I_BDB_inv @ D1_invB.T
+
+
+        #KL divergence
+        Sigma_diff = np.log(Sigma1_det / Sigma0_det)
+        Mean_sigma = mean_diff.T @ Sigma_inv @ mean_diff
+        Sigma_trace = np.trace(Sigma_inv @ Sigma0)
+        return .5 * (Sigma_diff - self.dim + Mean_sigma + Sigma_trace)
+
+
+    def log_density(self,var_param, x):
+        if x.ndim == 1:
+            x = x[np.newaxis, :]
+        param_dict = self._pattern.fold(var_param)
+        mean = param_dict['mu']
+        B = param_dict['low_rank']
+        D_exp = np.exp(2*param_dict['log_sigma'])
+        D_ma = np.diag(D_exp)
+        D_inv = np.linalg.inv(D_ma)
+        Sigma = np.dot(B, B.T) + D_ma
+        Sigma_det = np.linalg.det(Sigma)
+
+        # By the Woodbury formula
+        D_invB = D_inv @ B
+        I_BDB_inv = np.linalg.inv(np.eye(self._k) + np.dot(B.T, D_invB))
+        Sigma_inv = D_inv - D_invB @ I_BDB_inv @ D_invB.T
+
+        # Compute the log density of the multivariate Gaussian distribution for each row of X
+        diff = x - mean
+        log_p = -0.5 * (self.dim * np.log(2 * np.pi) + np.log(Sigma_det) + np.sum(diff @ Sigma_inv * diff, axis=1))
+
+        return log_p
+
+    def mean_and_cov(self, var_param):
+        param_dict = self._pattern.fold(var_param)
+        B = param_dict['low_rank']
+        D_exp = np.exp(2 * param_dict['log_sigma'])
+        return param_dict['mu'], np.dot(B, B.T) + np.diag(D_exp)
+
+    def _pth_moment(self, var_param, p):
+        param_dict = self._pattern.fold(var_param)
+        D_exp = np.exp(2 * param_dict['log_sigma'])
+        B = param_dict['low_rank']
+        Sigma = np.diag(D_exp) + np.dot(B, B.T)
+        Scale = np.linalg.eigvalsh(Sigma)
+        if p == 2:
+            return np.sum(Scale)
+        else:  # p == 4
+            return 2 * np.sum(Scale**2) + np.sum(Scale)**2
+
+    def supports_pth_moment(self, p):
+        return p in [2, 4]
