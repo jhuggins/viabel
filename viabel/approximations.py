@@ -555,6 +555,11 @@ def _get_low_rank_mu_sigma_pattern(dim, k):
     ms_pattern['low_rank'] = NumericArrayPattern(shape=(dim, k))
     return ms_pattern
 
+def _get_log_det_sigma(sigma):
+    L = np.linalg.cholesky(sigma)
+    Sigma_det = 2 * np.sum(np.log(np.diag(L)))
+    return Sigma_det
+
 class LRGaussian(ApproximationFamily):
     """A low rank Gaussian approximation family."""
 
@@ -596,8 +601,9 @@ class LRGaussian(ApproximationFamily):
         B = param_dict['low_rank']
         D_exp = np.exp(2 * param_dict['log_sigma'])
         Sigma = np.diag(D_exp) + np.dot(B, B.T)
-        Sigma_det = np.linalg.det(Sigma)
-        return 0.5 * self.dim * ( np.log(2 * np.pi * np.e)) + 0.5 * np.log(Sigma_det)
+        Sigma_det = _get_log_det_sigma(Sigma)
+
+        return 0.5 * self.dim * (np.log(2 * np.pi ) + 1) + 0.5 * np.log(Sigma_det)
 
     def _kl(self, var_param0, var_param1):
         param_dict0 = self._pattern.fold(var_param0)
@@ -607,14 +613,20 @@ class LRGaussian(ApproximationFamily):
         B0 = param_dict0['low_rank']
         D0 = np.exp(2 * param_dict0['log_sigma'])
         Sigma0 = np.diag(D0) + np.dot(B0, B0.T)
-        Sigma0_det = np.linalg.det(Sigma0)
+        Sigma0_det = _get_log_det_sigma(Sigma0)
 
         B1 = param_dict1['low_rank']
         D1 = np.exp(2 * param_dict1['log_sigma'])
         D1_ma = np.diag(D1)
-        D1_inv = np.linalg.inv(D1_ma)
+
+        #return inverse of D1_ma
+        L = np.linalg.cholesky(D1_ma)
+        y = np.linalg.solve(L,np.eye(self.dim))
+        D1_inv = np.linalg.solve(L.T, y)
+
+
         Sigma1 = D1_ma + np.dot(B1, B1.T)
-        Sigma1_det = np.linalg.det(Sigma1)
+        Sigma1_det = _get_log_det_sigma(Sigma1)
 
         #By the Woodbury formula
         D1_invB = np.dot(D1_inv, B1)
@@ -637,9 +649,14 @@ class LRGaussian(ApproximationFamily):
         B = param_dict['low_rank']
         D_exp = np.exp(2*param_dict['log_sigma'])
         D_ma = np.diag(D_exp)
-        D_inv = np.linalg.inv(D_ma)
+
+        #return inverse of D1_ma
+        L = np.linalg.cholesky(D1_ma)
+        y = np.linalg.solve(L,np.eye(self.dim))
+        D1_inv = np.linalg.solve(L.T, y)
+
         Sigma = np.dot(B, B.T) + D_ma
-        Sigma_det = np.linalg.det(Sigma)
+        Sigma_det =_get_log_det_sigma(Sigma)
 
         # By the Woodbury formula
         D_invB = D_inv @ B
