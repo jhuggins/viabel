@@ -555,10 +555,20 @@ def _get_low_rank_mu_sigma_pattern(dim, k):
     ms_pattern['low_rank'] = NumericArrayPattern(shape=(dim, k))
     return ms_pattern
 
-def _get_log_det_sigma(sigma):
-    L = np.linalg.cholesky(sigma)
-    Sigma_det = 2 * np.sum(np.log(np.diag(L)))
-    return Sigma_det
+def matrix_determinant_lemma(D, B):
+    # Compute the determinant of the matrix using the matrix determinant lemma
+    det_D = np.prod(D)
+    inv_D = 1/D
+    det_IpDBBT = np.linalg.det(np.eye(len(D)) + inv_D @ B @ B.T)
+    det_M = det_D * det_IpDBBT
+    return det_M
+
+def matrix_trace_lemma(D1, B1, D2, B2):
+    # Compute the trace of the product of two matrices using the matrix trace lemma
+    tr_D1D2 = np.sum(D1 * D2)
+    tr_B1TB2B2T = np.sum(np.diag(B1.T @ B2 @ B2.T @ B1 @ D1))
+    tr_M1M2 = tr_D1D2 + tr_B1TB2B2T
+    return tr_M1M2
 
 class LRGaussian(ApproximationFamily):
     """A low rank Gaussian approximation family."""
@@ -600,8 +610,7 @@ class LRGaussian(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         B = param_dict['low_rank']
         D_exp = np.exp(2 * param_dict['log_sigma'])
-        Sigma = np.diag(D_exp) + np.dot(B, B.T)
-        Sigma_det = _get_log_det_sigma(Sigma)
+        Sigma_det = matrix_determinant_lemma(D_exp, B)
 
         return 0.5 * self.dim * (np.log(2 * np.pi ) + 1) + 0.5 * np.log(Sigma_det)
 
@@ -612,21 +621,13 @@ class LRGaussian(ApproximationFamily):
 
         B0 = param_dict0['low_rank']
         D0 = np.exp(2 * param_dict0['log_sigma'])
-        Sigma0 = np.diag(D0) + np.dot(B0, B0.T)
-        Sigma0_det = _get_log_det_sigma(Sigma0)
+        Sigma0_det = matrix_determinant_lemma(D0, B0)
 
         B1 = param_dict1['low_rank']
         D1 = np.exp(2 * param_dict1['log_sigma'])
-        D1_ma = np.diag(D1)
+        D1_inv = np.diag(1/D1)
 
-        #return inverse of D1_ma
-        L = np.linalg.cholesky(D1_ma)
-        y = np.linalg.solve(L,np.eye(self.dim))
-        D1_inv = np.linalg.solve(L.T, y)
-
-
-        Sigma1 = D1_ma + np.dot(B1, B1.T)
-        Sigma1_det = _get_log_det_sigma(Sigma1)
+        Sigma1_det = matrix_determinant_lemma(D1, B1)
 
         #By the Woodbury formula
         D1_invB = np.dot(D1_inv, B1)
@@ -635,10 +636,10 @@ class LRGaussian(ApproximationFamily):
 
 
         #KL divergence
-        Sigma_diff = np.log(Sigma1_det / Sigma0_det)
+        Sigma_log_diff = np.log(Sigma1_det / Sigma0_det)
         Mean_sigma = mean_diff.T @ Sigma_inv @ mean_diff
-        Sigma_trace = np.trace(Sigma_inv @ Sigma0)
-        return .5 * (Sigma_diff - self.dim + Mean_sigma + Sigma_trace)
+        Sigma_trace = matrix_trace_lemma(D0,B0,D1,B1)
+        return .5 * (Sigma_log_diff - self.dim + Mean_sigma + Sigma_trace)
 
 
     def log_density(self,var_param, x):
@@ -648,15 +649,9 @@ class LRGaussian(ApproximationFamily):
         mean = param_dict['mu']
         B = param_dict['low_rank']
         D_exp = np.exp(2*param_dict['log_sigma'])
-        D_ma = np.diag(D_exp)
+        D_inv = np.diag(1/D1)
 
-        #return inverse of D1_ma
-        L = np.linalg.cholesky(D1_ma)
-        y = np.linalg.solve(L,np.eye(self.dim))
-        D1_inv = np.linalg.solve(L.T, y)
-
-        Sigma = np.dot(B, B.T) + D_ma
-        Sigma_det =_get_log_det_sigma(Sigma)
+        Sigma_det = matrix_determinant_lemma(D_exp, B)
 
         # By the Woodbury formula
         D_invB = D_inv @ B
@@ -679,8 +674,11 @@ class LRGaussian(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         D_exp = np.exp(2 * param_dict['log_sigma'])
         B = param_dict['low_rank']
-        Sigma = np.diag(D_exp) + np.dot(B, B.T)
-        Scale = np.linalg.eigvalsh(Sigma)
+
+        #eigvals = eigavalsh(B.T @ B) + eigavalsh(D)
+        eig_bbT = np.linalg.eigvalsh(B @ B.T)
+        eig_d = np.sum(D_exp)
+        Scale = eig_bbT + eig_d
         if p == 2:
             return np.sum(Scale)
         else:  # p == 4
