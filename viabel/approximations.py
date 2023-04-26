@@ -561,7 +561,7 @@ def matrix_determinant_lemma(D, B):
     inv_D = 1/D
     det_IpDBBT = np.linalg.det(np.eye(len(D)) + inv_D @ B @ B.T)
     det_M = det_D * det_IpDBBT
-    return det_M
+    return np.log(det_M)
 
 def matrix_trace_lemma(D1, B1, D2, B2):
     # Compute the trace of the product of two matrices using the matrix trace lemma
@@ -610,9 +610,9 @@ class LRGaussian(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         B = param_dict['low_rank']
         D_exp = np.exp(2 * param_dict['log_sigma'])
-        Sigma_det = matrix_determinant_lemma(D_exp, B)
+        Sigma_log_det = matrix_determinant_lemma(D_exp, B)
 
-        return 0.5 * self.dim * (np.log(2 * np.pi ) + 1) + 0.5 * np.log(Sigma_det)
+        return 0.5 * self.dim * (np.log(2 * np.pi ) + 1) + 0.5 * Sigma_log_det
 
     def _kl(self, var_param0, var_param1):
         param_dict0 = self._pattern.fold(var_param0)
@@ -621,22 +621,22 @@ class LRGaussian(ApproximationFamily):
 
         B0 = param_dict0['low_rank']
         D0 = np.exp(2 * param_dict0['log_sigma'])
-        Sigma0_det = matrix_determinant_lemma(D0, B0)
+        Sigma0_log_det = matrix_determinant_lemma(D0, B0)
 
         B1 = param_dict1['low_rank']
         D1 = np.exp(2 * param_dict1['log_sigma'])
         D1_inv = np.diag(1/D1)
 
-        Sigma1_det = matrix_determinant_lemma(D1, B1)
+        Sigma1_log_det = matrix_determinant_lemma(D1, B1)
 
         #By the Woodbury formula
         D1_invB = np.dot(D1_inv, B1)
-        I_BDB_inv = np.linalg.inv(np.eye(self._k) + np.dot(B1.T, D1_invB))
+        I_BDB_inv = np.linalg.solve(np.eye(self._k) + np.dot(B1.T, D1_invB))
         Sigma_inv = D1_inv - D1_invB @ I_BDB_inv @ D1_invB.T
 
 
         #KL divergence
-        Sigma_log_diff = np.log(Sigma1_det / Sigma0_det)
+        Sigma_log_diff = Sigma1_log_det / Sigma0_log_det
         Mean_sigma = mean_diff.T @ Sigma_inv @ mean_diff
         Sigma_trace = matrix_trace_lemma(D0,B0,D1,B1)
         return .5 * (Sigma_log_diff - self.dim + Mean_sigma + Sigma_trace)
@@ -651,16 +651,16 @@ class LRGaussian(ApproximationFamily):
         D_exp = np.exp(2*param_dict['log_sigma'])
         D_inv = np.diag(1/D1)
 
-        Sigma_det = matrix_determinant_lemma(D_exp, B)
+        Sigma_log_det = matrix_determinant_lemma(D_exp, B)
 
         # By the Woodbury formula
         D_invB = D_inv @ B
-        I_BDB_inv = np.linalg.inv(np.eye(self._k) + np.dot(B.T, D_invB))
+        I_BDB_inv = np.linalg.solve(np.eye(self._k) + np.dot(B.T, D_invB))
         Sigma_inv = D_inv - D_invB @ I_BDB_inv @ D_invB.T
 
         # Compute the log density of the multivariate Gaussian distribution for each row of X
         diff = x - mean
-        log_p = -0.5 * (self.dim * np.log(2 * np.pi) + np.log(Sigma_det) + np.sum(diff @ Sigma_inv * diff, axis=1))
+        log_p = -0.5 * (self.dim * np.log(2 * np.pi) + Sigma_log_det + np.sum(diff @ Sigma_inv * diff, axis=1))
 
         return log_p
 
