@@ -18,7 +18,8 @@ __all__ = [
     'MFStudentT',
     'MultivariateT',
     'NeuralNet',
-    'NVPFlow'
+    'NVPFlow',
+    'LRGaussian'
 ]
 
 
@@ -565,9 +566,8 @@ def _get_log_determinant(D, B):
         B : `numpy array`
         low rank component of covariance matrix.
     """
-    log_det_D = 2 * np.sum(D)
-    det_IpDBBT = np.linalg.det(np.eye(len(D)) + B @ B.T / np.exp(2 * D[:,np.newaxis]))
-    log_det_IpDBBT = np.log(det_IpDBBT)
+    log_det_D = 2*np.sum(D)
+    _,log_det_IpDBBT = np.linalg.slogdet(np.eye(len(D)) + B @ B.T/np.exp(2*D[:,np.newaxis]))
     log_det_M = log_det_D + log_det_IpDBBT
     return log_det_M
 
@@ -587,10 +587,8 @@ def _get_trace(D0, B0, D1, B1):
     """
 
     I_B1D1B1 = np.eye(B1.shape[1]) + B1.T / D1 @ B1
-    I_B1D1B1_inv = np.linalg.solve(I_B1D1B1, np.identity(I_B1D1B1.shape[0]))
-
     invD1_B1 = B1 / D1[:, np.newaxis]
-    invD1_B1_I_B1D1B1_inv = invD1_B1 @ I_B1D1B1_inv
+    invD1_B1_I_B1D1B1_inv = (np.linalg.solve(I_B1D1B1.T, invD1_B1.T)).T
     product = invD1_B1_I_B1D1B1_inv @ B1.T / D1[:, np.newaxis]
 
     trace_product = np.sum(product * D0[:, np.newaxis])
