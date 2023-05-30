@@ -591,16 +591,16 @@ def _get_trace(D0, B0, D1, B1):
     invD1_B1_I_B1D1B1_inv = (np.linalg.solve(I_B1D1B1.T, invD1_B1.T)).T
     product = invD1_B1_I_B1D1B1_inv @ B1.T / D1[:, np.newaxis]
 
-    trace_product = np.sum(product * D0[:, np.newaxis])
+    trace_product = np.trace(product @ D0[:, np.newaxis])
 
     # Compute Tr(D0 * D1^-1)
     trace_D0_invD1 = np.sum(D0 / D1)
 
     # Compute Tr(np.diag(D1)^(-1) * B0 @ B0.T)
-    trace_invD1_B0B0T = np.sum((B0 @ B0.T) / D1[:, np.newaxis])
+    trace_invD1_B0B0T = np.trace((B0 @ B0.T) / D1[:, np.newaxis])
 
     # Compute Tr(np.diag(D1)^(-1) * B1 * (I + B1.T * D1^-1 * B1)^-1 * B1^T * D1^-1 * B0 @ B0.T)
-    trace_extra_term = np.sum(product @ B0 @ B0.T)
+    trace_extra_term = np.trace(product @ B0 @ B0.T)
 
     # Return Tr(sigma0 * sigma1^-1) = Tr(D0 * D1^-1) + Tr(np.diag(D1)^(-1) * B0 @ B0.T) - Tr(D0 * np.diag(D1)^(-1) * B1 * (I + B1^T * D1^-1 * B1)^-1 * B1^T * D1^-1) - Tr(np.diag(D1)^(-1) * B1 * (I + B1.T * D1^-1 * B1)^-1 * B1^T * D1^-1 * B0 @ B0.T)
     return trace_D0_invD1 + trace_invD1_B0B0T - trace_product - trace_extra_term
