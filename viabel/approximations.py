@@ -585,19 +585,20 @@ def _get_trace(D0, B0, D1, B1):
     B1 : `numpy array`
         Low-rank component of sigma1.
     """
-
+    
     I_B1D1B1 = np.eye(B1.shape[1]) + B1.T / D1 @ B1
     invD1_B1 = B1 / D1[:, np.newaxis]
-    invD1_B1_I_B1D1B1_inv = (np.linalg.solve(I_B1D1B1.T, invD1_B1.T)).T
-    product = invD1_B1_I_B1D1B1_inv @ B1.T / D1[:, np.newaxis]
+    invD1_B1_I_B1D1B1_inv = np.linalg.solve(I_B1D1B1.T, invD1_B1.T).T
+    product = invD1_B1_I_B1D1B1_inv @ (B1.T / D1)
 
-    trace_product = np.trace(product @ D0[:, np.newaxis])
+    # Compute Tr(D0 * B1 * (I + B1^T * D1^-1 * B1)^-1 * B1^T * D1^-1)
+    trace_product = np.trace(product * D0)
 
     # Compute Tr(D0 * D1^-1)
     trace_D0_invD1 = np.sum(D0 / D1)
 
     # Compute Tr(np.diag(D1)^(-1) * B0 @ B0.T)
-    trace_invD1_B0B0T = np.trace((B0 @ B0.T) / D1[:, np.newaxis])
+    trace_invD1_B0B0T = np.trace(B0 @ B0.T / D1)
 
     # Compute Tr(np.diag(D1)^(-1) * B1 * (I + B1.T * D1^-1 * B1)^-1 * B1^T * D1^-1 * B0 @ B0.T)
     trace_extra_term = np.trace(product @ B0 @ B0.T)
