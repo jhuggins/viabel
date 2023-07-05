@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import autograd.numpy as np
 import autograd.numpy.random as npr
-from autograd import value_and_grad, vector_jacobian_product, make_hvp
+from autograd import value_and_grad, vector_jacobian_product, make_hvp, elementwise_grad, grad, hessian
 from autograd.core import getval
 
 __all__ = [
