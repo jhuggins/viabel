@@ -147,6 +147,171 @@ class ExclusiveKL(StochasticVariationalObjective):
         return hvp_fun(x)
 
 
+class RGE(StochasticVariationalObjective):
+    """ reparameterization gradient
+
+    """
+    def __init__(self, approx, model, num_mc_samples, hessian_approx_method="full"):
+        """
+        Parameters
+        ----------
+        approx : `ApproximationFamily` object
+        model : `Model` object
+        num_mc_sample : `int`
+            Number of Monte Carlo samples to use to approximate the objective.
+
+        """
+        # self._use_path_deriv = use_path_deriv
+        super().__init__(approx, model, num_mc_samples)
+
+        self.hessian_approx_method = hessian_approx_method
+
+    def _update_objective_and_grad(self):
+        approx = self.approx
+
+        def variational_objective(var_param):
+
+            z_samples = approx.sample(var_param, self.num_mc_samples)
+
+            m_mean, cov = approx.mean_and_cov(var_param)
+            s_scale = np.sqrt(np.diag(cov))
+
+            epsilon_sample = (z_samples - m_mean) / s_scale
+
+            elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
+
+
+            # self.model takes in one single parameter to calcualte grad and hessian
+            def f_model(x):
+                x = np.atleast_2d(x)
+                return self._model(x)
+            # estimate grad and hessian
+            grad_f = elementwise_grad(self.model)
+            grad_f_single = grad(f_model)
+
+            dLdm = grad_f(z_samples)
+            # log-std
+            # dLds = dLdm * epsilon_sample + 1 / s_scale
+            dLdlns = dLdm * epsilon_sample * s_scale + 1
+            # var_param MC gradient
+            g_hat_rprm_grad = np.column_stack([dLdm, dLdlns])
+
+            if self.hessian_approx_method == "full":
+                hessian_f = hessian(f_model)
+
+                scaled_samples = np.multiply(s_scale, epsilon_sample)
+                ## Miller's implementation
+
+                gmu = grad_f(m_mean)
+                H = hessian_f(m_mean).squeeze()
+                Hdiag = np.diag(H)
+
+                # construct normal approx samples of data term
+                dLdz = gmu + np.dot(H, (s_scale * epsilon_sample).T).T
+                # dLds  = (dLdz*eps + 1/s_lam[None,:]) * s_lam
+                dLds = dLdz * epsilon_sample * s_scale + 1.
+                elbo_gsamps_tilde = np.column_stack([dLdz, dLds])
+
+                # characterize the mean of the dLds component (and z comp)
+                dLds_mu = (Hdiag * s_scale + 1 / s_scale) * s_scale
+                gsamps_tilde_mean = np.concatenate([gmu, dLds_mu])
+
+                # subtract mean to compute control variate
+                elbo_gsamps_cv = g_hat_rprm_grad - \
+                                 (elbo_gsamps_tilde - gsamps_tilde_mean)
+
+                g_hat_rv = np.mean(elbo_gsamps_cv, axis = 0)
+
+            elif self.hessian_approx_method == "mean_only":
+
+                # MC grad estimator
+                # mean
+
+                # linear approximation of gradient: mean
+                # print(np.max(z_samples))
+                scaled_samples = np.multiply(s_scale, epsilon_sample)
+
+                a = grad_f(m_mean * np.ones_like(z_samples))
+
+                # h = np.atleast_2d(hessian_f(m_mean).squeeze())
+                hvp = make_hvp(f_model)(m_mean)
+
+                b = np.array([hvp[0](s) for s in scaled_samples])
+
+                g_tilde_mean_approx = a + b
+                # linear approximation of gradient: log-scale
+                g_tilde_scale_approx_ln = np.zeros_like(g_tilde_mean_approx)
+
+                # Expectation of linear approximation of gradient: mean
+                E_g_tilde_mean = grad_f_single(m_mean)
+
+                # Expectation of linear approximation of gradient: log-scale
+                E_g_tilde_scale_ln = np.zeros_like(E_g_tilde_mean)
+                g_tilde = np.column_stack([g_tilde_mean_approx, g_tilde_scale_approx_ln])
+                E_g_tilde = np.concatenate([E_g_tilde_mean, E_g_tilde_scale_ln])
+                E_g_tilde = np.multiply(E_g_tilde, np.ones_like(g_tilde))
+
+
+                g_hat_rv = np.mean(g_hat_rprm_grad - (g_tilde - E_g_tilde), axis=0)
+
+            elif self.hessian_approx_method == "loo_diag_approx":
+                """ use other samples to estimate a per-sample diagonal
+                expectation
+                """
+                # assert ns > 1, "loo approximations require more than 1 sample"
+                # compute hessian vector products and save them for both parts
+                # hvps = np.array([vbobj.hvplnpdf(m_lam, s_scale*e) for e in eps])
+                hvp_lam = make_hvp(f_model)(m_mean)[0]
+
+                # hvps = np.zeros_like(epsilon_sample)
+                # for i in range(epsilon_sample.shape[1]):
+                #     b = s_scale * epsilon_sample[:, i]
+                #     hvps[:, i] = hvp_lam(b)
+                hvps = np.array([hvp_lam(s_scale * e) for e in epsilon_sample])
+                gmu = grad_f(m_mean * np.ones_like(z_samples))
+
+                # construct normal approx samples of data term
+                dLdz = gmu + hvps
+                # dLds   = (dLdz*eps + 1/s_scale[None,:]) * s_scale
+                dLds = dLdz * (epsilon_sample * s_scale) + 1
+
+                # compute Leave One Out approximate diagonal (per-sample mean of dLds)
+                Hdiag_sum = np.sum(epsilon_sample * hvps, axis=0)
+                Hdiag_s = (Hdiag_sum[None, :] - epsilon_sample * hvps) / float(np.shape(z_samples)[0] - 1)
+                dLds_mu = (Hdiag_s + 1 / s_scale[None, :]) * s_scale
+
+                # compute gsamps_cv - mean(gsamps_cv), and finally the var reduced
+                # elbo_gsamps_tilde_centered = \
+                #    np.column_stack([ hvps, dLds - dLds_mu ])
+                # elbo_gsamps_cv = elbo_gsamps - elbo_gsamps_tilde_centered
+                # return elbo_gsamps_cv
+                D = int(0.5 * np.shape(g_hat_rprm_grad)[1])
+                g_hat_rv = g_hat_rprm_grad.copy()
+                g_hat_rv[:, :D] -= hvps
+                g_hat_rv[:, D:] -= (dLds - dLds_mu)
+                g_hat_rv = np.mean(g_hat_rv,axis=0)
+
+            elif self.hessian_approx_method == "loo_direct_approx":
+                hvp_lam = make_hvp(f_model)(m_mean)[0]
+                gmu = grad_f(m_mean * np.ones_like(z_samples))
+                hvps = np.array([hvp_lam(s_scale * e) for e in epsilon_sample])
+
+                # construct normal approx samples of data term
+                dLdz = gmu + hvps
+                dLds = (dLdz * epsilon_sample + 1 / s_scale[None, :]) * s_scale
+                elbo_gsamps_tilde = np.column_stack([dLdz, dLds])
+
+                # compute Leave One Out approximate diagonal (per-sample mean of dLds)
+                dLds_sum = np.sum(dLds, axis=0)
+                dLds_mu = (dLds_sum[None, :] - dLds) / float(np.shape(z_samples)[0] - 1)
+
+                # compute gsamps_cv - mean(gsamps_cv), and finally the var reduced
+                elbo_gsamps_tilde_centered = np.column_stack([dLdz - gmu, dLds - dLds_mu])
+                g_hat_rv = np.mean(g_hat_rprm_grad - elbo_gsamps_tilde_centered, axis = 0)
+
+            return -elbo, -g_hat_rv
+
+        self._objective_and_grad = variational_objective
 class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
 
