@@ -9,6 +9,7 @@ __all__ = [
     'VariationalObjective',
     'StochasticVariationalObjective',
     'ExclusiveKL',
+    'RGE',
     'DISInclusiveKL',
     'AlphaDivergence'
 ]
@@ -312,6 +313,7 @@ class RGE(StochasticVariationalObjective):
             return -elbo, -g_hat_rv
 
         self._objective_and_grad = variational_objective
+
 class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""
 

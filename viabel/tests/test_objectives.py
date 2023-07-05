@@ -3,7 +3,7 @@ import numpy as np
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
-from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL
+from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL, RGE
 from viabel.optimization import RMSProp
 
 
