@@ -20,7 +20,7 @@ def _test_kl(approx, var_param0, var_param1):
     kl = approx.kl(var_param0, var_param1)
     samples = approx.sample(var_param0, MC_SAMPLES)
     log_prob_diffs = approx.log_density(var_param0, samples) - \
-        approx.log_density(var_param1, samples)
+                     approx.log_density(var_param1, samples)
 
     p_value = stats.ttest_1samp(log_prob_diffs, kl)[1]
     assert p_value > test_size
@@ -47,9 +47,9 @@ def _test_pth_moment(approx, var_param, p):
     sample_mean = np.mean(samples, axis=0)
     sample_norms = np.linalg.norm(samples - sample_mean, axis=1, ord=2)
 
-    p_value = stats.ttest_1samp(sample_norms**p, pth_moment)[1]
+    p_value = stats.ttest_1samp(sample_norms ** p, pth_moment)[1]
     assert p_value > test_size, "expected: {}, estimated: {}".format(
-        pth_moment, np.mean(sample_norms**p))
+        pth_moment, np.mean(sample_norms ** p))
 
 
 def _test_family(approx, var_param0, var_param1, should_support=[], entropy_offset=0):
@@ -144,19 +144,18 @@ def test_NVP():
             var_param1 = np.random.randn(approx.var_param_dim) / 100
             _test_family(approx, var_param0, var_param1, [])
     # TODO: check behavior in corner cases
-    
+
 
 def test_LRGaussian():
     np.random.seed(1214)
     k = 3
     for dim in [1, 6]:
-        approx =approximations.LRGaussian(dim,k)
+        approx = approximations.LRGaussian(dim, k)
         for i in range(6):
             var_param0 = np.random.randn(approx.var_param_dim)
             var_param1 = np.random.randn(approx.var_param_dim)
             _test_family(approx, var_param0, var_param1, [2, 4])
-            
-            
+
 
 def test_get_log_determinant():
     D = np.array([-1, 0, 1])  # log scale
@@ -164,7 +163,8 @@ def test_get_log_determinant():
     # Expected result calculated manually or using a verified method
     expected_result = np.log(np.linalg.det(B @ B.T + np.diag(np.exp(2 * D))))
     actual_result = approximations._get_log_determinant(D, B)
-    return np.testing.assert_allclose(actual_result,expected_result,rtol=0.0001)
+    return np.testing.assert_allclose(actual_result, expected_result, rtol=0.0001)
+
 
 def test_get_trace():
     # Expected result calculated manually or using a verified method
@@ -177,5 +177,4 @@ def test_get_trace():
     sigma1_inv = np.linalg.inv(sigma1)
     expected_result = np.trace(sigma1_inv @ sigma0)
     actual_result = approximations._get_trace(np.exp(2 * D), B, np.exp(2 * D1), B1)
-    return np.testing.assert_allclose(actual_result,expected_result,rtol=0.0001)
-
+    return np.testing.assert_allclose(actual_result, expected_result, rtol=0.0001)

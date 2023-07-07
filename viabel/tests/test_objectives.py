@@ -71,11 +71,6 @@ def test_ExclusiveKL_loo_direct_path_deriv():
     _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_direct_approx')
 
 
-#
-# def test_ExclusiveKL_path_deriv():
-#     _test_objective(ExclusiveKL, 100, use_path_deriv=True)
-
-
 def test_DISInclusiveKL():
     dim = 2
     _test_objective(DISInclusiveKL, 100,

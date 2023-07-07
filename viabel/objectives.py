@@ -114,8 +114,8 @@ class ExclusiveKL(StochasticVariationalObjective):
 
     This implementation of reparameterization and control variate is based on:
 
-    "Reducing Reparameterization Gradient Variance" by Andrew C. Miller, Nicholas J. Fotiy , Alexander D'Amourx ,
-    and Ryan P. Adamsz, Code based on the implementation by Andrew C. Miller:
+    "Reducing Reparameterization Gradient Variance" by Andrew C. Miller, Nicholas J. Foti , Alexander D'Amour ,
+    and Ryan P. Adams, Code based on the implementation by Andrew C. Miller:
     https://github.com/andymiller/ReducedVarianceReparamGradients
 
     """
@@ -141,12 +141,11 @@ class ExclusiveKL(StochasticVariationalObjective):
         """
 
         self._use_path_deriv = use_path_deriv
-        if hessian_approx_method in ['full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx'] or hessian_approx_method is None:
+        if hessian_approx_method in [None, 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx']:
             self.hessian_approx_method = hessian_approx_method
         else:
-            print("Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx' "
-                  "or None object. ")
-            raise ValueError
+            raise ValueError("Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', "
+                             "'loo_direct_approx' or None object. ")
         super().__init__(approx, model, num_mc_samples)
 
     def _update_objective_and_grad(self):
@@ -189,7 +188,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             else:
                 lower_bound = np.mean(self.model(z_samples) - approx.log_density(z_samples))
 
-            # self.model takes in one single parameter to calcualte grad and hessian
+            # self.model takes in one single parameter to calculate grad and hessian
             def f_model(x):
                 x = np.atleast_2d(x)
                 return self._model(x)
@@ -235,15 +234,12 @@ class ExclusiveKL(StochasticVariationalObjective):
             elif self.hessian_approx_method == "mean_only":
 
                 # MC grad estimator
-                # mean
 
                 # linear approximation of gradient: mean
-                # print(np.max(z_samples))
                 scaled_samples = np.multiply(s_scale, epsilon_sample)
 
                 a = grad_f(m_mean * np.ones_like(z_samples))
 
-                # h = np.atleast_2d(hessian_f(m_mean).squeeze())
                 hvp = make_hvp(f_model)(m_mean)
 
                 b = np.array([hvp[0](s) for s in scaled_samples])
