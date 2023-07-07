@@ -3,10 +3,8 @@ import numpy as np
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
-from viabel.objectives import AlphaDivergence, DISInclusiveKL
+from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL
 from viabel.optimization import RMSProp
-
-from objectives import ExclusiveKL
 
 
 def _test_objective(objective_cls, num_mc_samples, **kwargs):
@@ -85,6 +83,3 @@ def test_DISInclusiveKL():
 def test_AlphaDivergence():
     _test_objective(AlphaDivergence, 100, alpha=2)
 
-
-if __name__=='__main__':
-    test_ExclusiveKL_loo_diag()

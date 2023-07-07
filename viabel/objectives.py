@@ -9,7 +9,6 @@ __all__ = [
     'VariationalObjective',
     'StochasticVariationalObjective',
     'ExclusiveKL',
-    'RGE',
     'DISInclusiveKL',
     'AlphaDivergence'
 ]
@@ -106,15 +105,6 @@ class StochasticVariationalObjective(VariationalObjective):
         self._update_objective_and_grad()
 
 
-
-
-    def _update_objective_and_grad(self):
-        approx = self.approx
-
-        def variational_objective(var_param):
-            samples = approx.sample(var_param, self.num_mc_samples)
-
-            return -lower_bound
 
 
 class ExclusiveKL(StochasticVariationalObjective):
