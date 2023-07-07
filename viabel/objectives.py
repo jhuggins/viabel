@@ -178,7 +178,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             epsilon_sample = (z_samples - m_mean) / s_scale
 
             # elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
-
+            # TODO: maybe variational_objective function can be called to replace this duplicated part
             if self._use_path_deriv:
                 var_param_stopped = getval(var_param)
                 lower_bound = np.mean(
@@ -189,6 +189,8 @@ class ExclusiveKL(StochasticVariationalObjective):
                 lower_bound = np.mean(self.model(z_samples) - approx.log_density(z_samples))
 
             # self.model takes in one single parameter to calculate grad and hessian
+            # TODO : this f_model is a trick to solve the vectorization problem, maybe it should be replaced by a formal
+            #  solution
             def f_model(x):
                 x = np.atleast_2d(x)
                 return self._model(x)
@@ -208,8 +210,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             if self.hessian_approx_method == "full":
                 hessian_f = hessian(f_model)
 
-                scaled_samples = np.multiply(s_scale, epsilon_sample)
-                ## Miller's implementation
+                # Miller's implementation
 
                 gmu = grad_f(m_mean)
                 H = hessian_f(m_mean).squeeze()
@@ -294,7 +295,6 @@ class ExclusiveKL(StochasticVariationalObjective):
                 # construct normal approx samples of data term
                 dLdz = gmu + hvps
                 dLds = (dLdz * epsilon_sample + 1 / s_scale[None, :]) * s_scale
-                elbo_gsamps_tilde = np.column_stack([dLdz, dLds])
 
                 # compute Leave One Out approximate diagonal (per-sample mean of dLds)
                 dLds_sum = np.sum(dLds, axis=0)
@@ -304,6 +304,9 @@ class ExclusiveKL(StochasticVariationalObjective):
                 elbo_gsamps_tilde_centered = np.column_stack([hvps, dLds - dLds_mu])
                 g_hat_rv = np.mean(g_hat_rprm_grad - elbo_gsamps_tilde_centered, axis=0)
 
+            # TODO : IDE reported g_hat_rv can be called before assigned since g_hat_rv is only assigned under the if
+            #  statement but not globally. There should not be an error because hessian_approx_method has been validated
+            #  so one of the if statement has to be run
             return -lower_bound, -g_hat_rv
 
         self._objective_and_grad = RGE
