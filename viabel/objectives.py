@@ -110,7 +110,14 @@ class ExclusiveKL(StochasticVariationalObjective):
 
     Equivalent to using the canonical evidence lower bound (ELBO)
 
-    with reparametrized gradient estimator and control variate
+    with reparameterized gradient estimator and control variate
+
+    This implementation of reparameterization and control variate is based on:
+
+    "Reducing Reparameterization Gradient Variance" by Andrew C. Miller, Nicholas J. Fotiy , Alexander D'Amourx ,
+    and Ryan P. Adamsz, Code based on the implementation by Andrew C. Miller:
+    https://github.com/andymiller/ReducedVarianceReparamGradients
+
     """
 
     def __init__(self, approx, model, num_mc_samples, use_path_deriv=False, hessian_approx_method=None):
@@ -132,6 +139,7 @@ class ExclusiveKL(StochasticVariationalObjective):
                 'loo_direct_approx;: the same method as 'loo_diag_approx' but use the scaled approximation to the
                     gradient of scale to do the "loo" estimation
         """
+
         self._use_path_deriv = use_path_deriv
         self.hessian_approx_method = hessian_approx_method
         super().__init__(approx, model, num_mc_samples)
@@ -139,22 +147,24 @@ class ExclusiveKL(StochasticVariationalObjective):
     def _update_objective_and_grad(self):
         approx = self.approx
 
-        def variational_objective(var_param):
-            samples = approx.sample(var_param, self.num_mc_samples)
-            if self._use_path_deriv:
-                var_param_stopped = getval(var_param)
-                lower_bound = np.mean(
-                    self.model(samples) - approx.log_density(var_param_stopped, samples))
-            elif approx.supports_entropy:
-                lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
-            else:
-                lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
-            return -lower_bound
-
         if self.hessian_approx_method is None:
+            def variational_objective(var_param):
+                samples = approx.sample(var_param, self.num_mc_samples)
+                if self._use_path_deriv:
+                    var_param_stopped = getval(var_param)
+                    lower_bound = np.mean(
+                        self.model(samples) - approx.log_density(var_param_stopped, samples))
+                elif approx.supports_entropy:
+                    lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
+                else:
+                    lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
+                return -lower_bound
+
             self._hvp = make_hvp(variational_objective)
             self._objective_and_grad = value_and_grad(variational_objective)
             return
+
+        assert self.hessian_approx_method in ['full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx']
 
         def RGE(var_param):
 
@@ -192,6 +202,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             # var_param MC gradient
             g_hat_rprm_grad = np.column_stack([dLdm, dLdlns])
 
+            # These implementation of using reparameterization and control variate to reduce variation
             if self.hessian_approx_method == "full":
                 hessian_f = hessian(f_model)
 

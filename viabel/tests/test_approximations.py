@@ -150,7 +150,7 @@ def test_LRGaussian():
     np.random.seed(1214)
     k = 3
     for dim in [1, 6]:
-        approx =LRGaussian(dim,k)
+        approx =approximations.LRGaussian(dim,k)
         for i in range(6):
             var_param0 = np.random.randn(approx.var_param_dim)
             var_param1 = np.random.randn(approx.var_param_dim)
@@ -163,7 +163,7 @@ def test_get_log_determinant():
     B = np.array([[1, 2], [3, 4], [5, 6]])
     # Expected result calculated manually or using a verified method
     expected_result = np.log(np.linalg.det(B @ B.T + np.diag(np.exp(2 * D))))
-    actual_result = _get_log_determinant(D, B)
+    actual_result = approximations._get_log_determinant(D, B)
     return np.testing.assert_allclose(actual_result,expected_result,rtol=0.0001)
 
 def test_get_trace():
@@ -176,6 +176,6 @@ def test_get_trace():
     sigma1 = B1 @ B1.T + np.diag(np.exp(2 * D1))
     sigma1_inv = np.linalg.inv(sigma1)
     expected_result = np.trace(sigma1_inv @ sigma0)
-    actual_result = _get_trace(np.exp(2 * D), B, np.exp(2 * D1), B1)
+    actual_result = approximations._get_trace(np.exp(2 * D), B, np.exp(2 * D1), B1)
     return np.testing.assert_allclose(actual_result,expected_result,rtol=0.0001)
 
