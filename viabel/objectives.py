@@ -141,7 +141,12 @@ class ExclusiveKL(StochasticVariationalObjective):
         """
 
         self._use_path_deriv = use_path_deriv
-        self.hessian_approx_method = hessian_approx_method
+        if hessian_approx_method in ['full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx'] or hessian_approx_method is None:
+            self.hessian_approx_method = hessian_approx_method
+        else:
+            print("Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx' "
+                  "or None object. ")
+            raise ValueError
         super().__init__(approx, model, num_mc_samples)
 
     def _update_objective_and_grad(self):
@@ -163,8 +168,6 @@ class ExclusiveKL(StochasticVariationalObjective):
             self._hvp = make_hvp(variational_objective)
             self._objective_and_grad = value_and_grad(variational_objective)
             return
-
-        assert self.hessian_approx_method in ['full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx']
 
         def RGE(var_param):
 

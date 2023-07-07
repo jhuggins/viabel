@@ -60,7 +60,7 @@ def test_ExclusiveKL_full_hessian_path_deriv():
 
 
 def test_ExclusiveKL_mean_cv_path_deriv():
-    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='mena_only')
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='mean_only')
 
 
 def test_ExclusiveKL_loo_diag_path_deriv():
