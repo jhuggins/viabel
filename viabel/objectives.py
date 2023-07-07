@@ -106,13 +106,26 @@ class StochasticVariationalObjective(VariationalObjective):
         self._update_objective_and_grad()
 
 
+
+
+    def _update_objective_and_grad(self):
+        approx = self.approx
+
+        def variational_objective(var_param):
+            samples = approx.sample(var_param, self.num_mc_samples)
+
+            return -lower_bound
+
+
 class ExclusiveKL(StochasticVariationalObjective):
     """Exclusive Kullback-Leibler divergence.
 
     Equivalent to using the canonical evidence lower bound (ELBO)
+
+    with reparametrized gradient estimator and control variate
     """
 
-    def __init__(self, approx, model, num_mc_samples, use_path_deriv=False):
+    def __init__(self, approx, model, num_mc_samples, use_path_deriv=False, hessian_approx_method = 'full'):
         """
         Parameters
         ----------
@@ -122,47 +135,16 @@ class ExclusiveKL(StochasticVariationalObjective):
             Number of Monte Carlo samples to use to approximate the objective.
         use_path_deriv : `bool`
             Use path derivative (for "sticking the landing") gradient estimator
+        hessian_approx_method : 'string'
+            Select from different methods for approximating the hessian:
+                'full' : use the full hessian matrix provided by BridgeStan
+                'mean_only' : use control variate only for mean estimator to avoid calculation of full hessian
+                'loo_diag_approx' : using "leave one out" method with hessian vector product value at other samples to
+                    estimate the diagonal values of hessian
+                'loo_direct_approx;: the same method as 'loo_diag_approx' but use the scaled approximation to the
+                    grdient of scale to do the "loo" estimation
         """
         self._use_path_deriv = use_path_deriv
-        super().__init__(approx, model, num_mc_samples)
-
-    def _update_objective_and_grad(self):
-        approx = self.approx
-
-        def variational_objective(var_param):
-            samples = approx.sample(var_param, self.num_mc_samples)
-            if self._use_path_deriv:
-                var_param_stopped = getval(var_param)
-                lower_bound = np.mean(
-                    self.model(samples) - approx.log_density(var_param_stopped, samples))
-            elif approx.supports_entropy:
-                lower_bound = np.mean(self.model(samples)) + approx.entropy(var_param)
-            else:
-                lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
-            return -lower_bound
-        self._hvp = make_hvp(variational_objective)
-        self._objective_and_grad = value_and_grad(variational_objective)
-
-    def _hessian_vector_product(self, var_param, x):
-        hvp_fun = self._hvp(var_param)[0]
-        return hvp_fun(x)
-
-
-class RGE(StochasticVariationalObjective):
-    """ reparameterization gradient
-
-    """
-    def __init__(self, approx, model, num_mc_samples, hessian_approx_method="full"):
-        """
-        Parameters
-        ----------
-        approx : `ApproximationFamily` object
-        model : `Model` object
-        num_mc_sample : `int`
-            Number of Monte Carlo samples to use to approximate the objective.
-
-        """
-        # self._use_path_deriv = use_path_deriv
         super().__init__(approx, model, num_mc_samples)
 
         self.hessian_approx_method = hessian_approx_method
@@ -179,7 +161,16 @@ class RGE(StochasticVariationalObjective):
 
             epsilon_sample = (z_samples - m_mean) / s_scale
 
-            elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
+            #elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
+
+            if self._use_path_deriv:
+                var_param_stopped = getval(var_param)
+                lower_bound = np.mean(
+                    self.model(z_samples) - approx.log_density(var_param_stopped, z_samples))
+            elif approx.supports_entropy:
+                lower_bound = np.mean(self.model(z_samples)) + approx.entropy(var_param)
+            else:
+                lower_bound = np.mean(self.model(z_samples) - approx.log_density(z_samples))
 
 
             # self.model takes in one single parameter to calcualte grad and hessian
@@ -252,7 +243,6 @@ class RGE(StochasticVariationalObjective):
                 E_g_tilde = np.concatenate([E_g_tilde_mean, E_g_tilde_scale_ln])
                 E_g_tilde = np.multiply(E_g_tilde, np.ones_like(g_tilde))
 
-
                 g_hat_rv = np.mean(g_hat_rprm_grad - (g_tilde - E_g_tilde), axis=0)
 
             elif self.hessian_approx_method == "loo_diag_approx":
@@ -261,19 +251,13 @@ class RGE(StochasticVariationalObjective):
                 """
                 # assert ns > 1, "loo approximations require more than 1 sample"
                 # compute hessian vector products and save them for both parts
-                # hvps = np.array([vbobj.hvplnpdf(m_lam, s_scale*e) for e in eps])
                 hvp_lam = make_hvp(f_model)(m_mean)[0]
 
-                # hvps = np.zeros_like(epsilon_sample)
-                # for i in range(epsilon_sample.shape[1]):
-                #     b = s_scale * epsilon_sample[:, i]
-                #     hvps[:, i] = hvp_lam(b)
                 hvps = np.array([hvp_lam(s_scale * e) for e in epsilon_sample])
                 gmu = grad_f(m_mean * np.ones_like(z_samples))
 
                 # construct normal approx samples of data term
                 dLdz = gmu + hvps
-                # dLds   = (dLdz*eps + 1/s_scale[None,:]) * s_scale
                 dLds = dLdz * (epsilon_sample * s_scale) + 1
 
                 # compute Leave One Out approximate diagonal (per-sample mean of dLds)
@@ -282,10 +266,6 @@ class RGE(StochasticVariationalObjective):
                 dLds_mu = (Hdiag_s + 1 / s_scale[None, :]) * s_scale
 
                 # compute gsamps_cv - mean(gsamps_cv), and finally the var reduced
-                # elbo_gsamps_tilde_centered = \
-                #    np.column_stack([ hvps, dLds - dLds_mu ])
-                # elbo_gsamps_cv = elbo_gsamps - elbo_gsamps_tilde_centered
-                # return elbo_gsamps_cv
                 D = int(0.5 * np.shape(g_hat_rprm_grad)[1])
                 g_hat_rv = g_hat_rprm_grad.copy()
                 g_hat_rv[:, :D] -= hvps
@@ -307,12 +287,17 @@ class RGE(StochasticVariationalObjective):
                 dLds_mu = (dLds_sum[None, :] - dLds) / float(np.shape(z_samples)[0] - 1)
 
                 # compute gsamps_cv - mean(gsamps_cv), and finally the var reduced
-                elbo_gsamps_tilde_centered = np.column_stack([dLdz - gmu, dLds - dLds_mu])
+                elbo_gsamps_tilde_centered = np.column_stack([hvps, dLds - dLds_mu])
                 g_hat_rv = np.mean(g_hat_rprm_grad - elbo_gsamps_tilde_centered, axis = 0)
 
-            return -elbo, -g_hat_rv
+            return -lower_bound, -g_hat_rv
 
         self._objective_and_grad = variational_objective
+        self._hvp = make_hvp(variational_objective)
+
+    def _hessian_vector_product(self, var_param, x):
+        hvp_fun = self._hvp(var_param)[0]
+        return hvp_fun(x)
 
 class DISInclusiveKL(StochasticVariationalObjective):
     """Inclusive Kullback-Leibler divergence using Distilled Importance Sampling."""

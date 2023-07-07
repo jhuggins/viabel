@@ -3,8 +3,10 @@ import numpy as np
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
-from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL, RGE
+from viabel.objectives import AlphaDivergence, DISInclusiveKL
 from viabel.optimization import RMSProp
+
+from objectives import ExclusiveKL
 
 
 def _test_objective(objective_cls, num_mc_samples, **kwargs):
@@ -16,6 +18,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
 
     def log_p(x):
         return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+
     approx = MFStudentT(2, 100)
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
@@ -30,12 +33,45 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=1)
 
 
-def test_ExclusiveKL():
-    _test_objective(ExclusiveKL, 100)
+#
+# def test_ExclusiveKL():
+#     _test_objective(ExclusiveKL, 100, hessian_approx_method='full')
+
+def test_ExclusiveKL_full_hessian():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='full')
 
 
-def test_ExclusiveKL_path_deriv():
-    _test_objective(ExclusiveKL, 100, use_path_deriv=True)
+def test_ExclusiveKL_mean_cv():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='mean_only')
+
+
+def test_ExclusiveKL_loo_diag():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='loo_diag_approx')
+
+
+def test_ExclusiveKL_loo_direct():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='loo_direct_approx')
+
+
+def test_ExclusiveKL_full_hessian_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='full')
+
+
+def test_ExclusiveKL_mean_cv_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='mena_only')
+
+
+def test_ExclusiveKL_loo_diag_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_diag_approx')
+
+
+def test_ExclusiveKL_loo_direct_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_direct_approx')
+
+
+#
+# def test_ExclusiveKL_path_deriv():
+#     _test_objective(ExclusiveKL, 100, use_path_deriv=True)
 
 
 def test_DISInclusiveKL():
@@ -48,3 +84,7 @@ def test_DISInclusiveKL():
 
 def test_AlphaDivergence():
     _test_objective(AlphaDivergence, 100, alpha=2)
+
+
+if __name__=='__main__':
+    test_ExclusiveKL_loo_diag()
