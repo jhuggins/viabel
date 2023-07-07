@@ -31,9 +31,13 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=1)
 
 
-#
-# def test_ExclusiveKL():
-#     _test_objective(ExclusiveKL, 100, hessian_approx_method='full')
+def test_ExclusiveKL():
+    _test_objective(ExclusiveKL, 100)
+
+
+def test_ExclusiveKL_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True)
+
 
 def test_ExclusiveKL_full_hessian():
     _test_objective(ExclusiveKL, 100, hessian_approx_method='full')
@@ -82,4 +86,3 @@ def test_DISInclusiveKL():
 
 def test_AlphaDivergence():
     _test_objective(AlphaDivergence, 100, alpha=2)
-
