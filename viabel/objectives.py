@@ -187,6 +187,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             def f_model(x):
                 x = np.atleast_2d(x)
                 return self._model(x)
+
             # estimate grad and hessian
             grad_f = elementwise_grad(self.model)
             grad_f_single = grad(f_model)
@@ -382,8 +383,7 @@ class DISInclusiveKL(StochasticVariationalObjective):
         if sum_unclipped == 0:
             # Impossible to clip further!
             return w
-        w[to_clip] = self._w_clip_threshold * sum_unclipped \
-                     / (1. - self._w_clip_threshold * n_to_clip)
+        w[to_clip] = self._w_clip_threshold * sum_unclipped(1. - self._w_clip_threshold * n_to_clip)
         return self._clip_weights(w)
 
     def _update_objective_and_grad(self):

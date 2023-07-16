@@ -2,7 +2,17 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="3abb0de2-fe68-4baf-b615-ec06b1b57da2" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/viabel/.idea/viabel.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/viabel.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/viabel.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/viabel/objectives.py" beforeDir="false" afterPath="$PROJECT_DIR$/viabel/objectives.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
