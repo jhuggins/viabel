@@ -1,5 +1,6 @@
 import autograd.numpy as anp
 import numpy as np
+import pytest
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
@@ -69,6 +70,13 @@ def test_ExclusiveKL_loo_diag_path_deriv():
 
 def test_ExclusiveKL_loo_direct_path_deriv():
     _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_direct_approx')
+
+
+def test_invalid_hessian_approx_method():
+    with pytest.raises(ValueError) as exception_info:
+        _test_objective(ExclusiveKL, 100, hessian_approx_method='invalid method')
+    assert str(
+        exception_info.value) == "Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx' or None object."
 
 
 def test_DISInclusiveKL():
