@@ -24,9 +24,9 @@ script:
 before_install:
   - sudo apt-get update
   - sudo apt-get install -y libssl-dev
-  - wget https://www.python.org/ftp/python/3.9.6/Python-3.9.6.tgz
-  - tar xvf Python-3.9.6.tgz
-  - cd Python-3.9.6
+  - wget https://www.python.org/ftp/python/3.9.7/Python-3.9.7.tgz
+  - tar xvf Python-3.9.7.tgz
+  - cd Python-3.9.7
   - ./configure --with-openssl=/usr/bin/openssl
   - make
   - sudo make altinstall
