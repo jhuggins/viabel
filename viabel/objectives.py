@@ -144,8 +144,7 @@ class ExclusiveKL(StochasticVariationalObjective):
         if hessian_approx_method in [None, 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx']:
             self.hessian_approx_method = hessian_approx_method
         else:
-            raise ValueError("Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', "
-                             "'loo_direct_approx' or None object. ")
+            raise ValueError("Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx' or None object. ")
         super().__init__(approx, model, num_mc_samples)
 
     def _update_objective_and_grad(self):
