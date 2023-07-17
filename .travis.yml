@@ -1,7 +1,6 @@
 language: python
 python:
-  - 3.9.7
-
+  - 3.9
 
 notifications:
   email:
@@ -11,28 +10,13 @@ notifications:
     on_failure: always # default: always
 
 install:
-  - pip install -r requirements.txt
   - pip install -U importlib_metadata  # see https://travis-ci.community/t/build-error-for-python-3-7-on-two-different-projects/12895
   - pip install .[dev]
 
 script:
-  - python -m unittest discover
   - coverage run --include='viabel/[A-Za-z]*.py' -m pytest
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
-
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y libssl-dev
-  - wget https://www.python.org/ftp/python/3.9.7/Python-3.9.7.tgz
-  - tar xvf Python-3.9.7.tgz
-  - cd Python-3.9.7
-  - ./configure --with-openssl=/usr/bin/openssl
-  - make
-  - sudo make altinstall
-  - cd ..
-
-
 
 
 
