@@ -1,5 +1,6 @@
 import autograd.numpy as anp
 import numpy as np
+import pytest
 from autograd.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
@@ -16,6 +17,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
 
     def log_p(x):
         return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+
     approx = MFStudentT(2, 100)
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
@@ -36,6 +38,45 @@ def test_ExclusiveKL():
 
 def test_ExclusiveKL_path_deriv():
     _test_objective(ExclusiveKL, 100, use_path_deriv=True)
+
+
+def test_ExclusiveKL_full_hessian():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='full')
+
+
+def test_ExclusiveKL_mean_cv():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='mean_only')
+
+
+def test_ExclusiveKL_loo_diag():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='loo_diag_approx')
+
+
+def test_ExclusiveKL_loo_direct():
+    _test_objective(ExclusiveKL, 100, hessian_approx_method='loo_direct_approx')
+
+
+def test_ExclusiveKL_full_hessian_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='full')
+
+
+def test_ExclusiveKL_mean_cv_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='mean_only')
+
+
+def test_ExclusiveKL_loo_diag_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_diag_approx')
+
+
+def test_ExclusiveKL_loo_direct_path_deriv():
+    _test_objective(ExclusiveKL, 100, use_path_deriv=True, hessian_approx_method='loo_direct_approx')
+
+
+def test_invalid_hessian_approx_method():
+    with pytest.raises(ValueError) as exception_info:
+        _test_objective(ExclusiveKL, 100, hessian_approx_method='invalid method')
+    assert str(
+        exception_info.value) == "Name of approximation must be one of 'full', 'mean_only', 'loo_diag_approx', 'loo_direct_approx' or None object."
 
 
 def test_DISInclusiveKL():

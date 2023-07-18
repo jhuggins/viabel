@@ -28,3 +28,5 @@ viabel.*.rst
 # python virtual environments
 *-env/
 venv/
+
+.idea

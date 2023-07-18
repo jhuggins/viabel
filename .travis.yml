@@ -1,7 +1,7 @@
 language: python
+dist: bionic
 python:
-  - 3.6
-  - 3.7
+  - 3.9
 
 notifications:
   email:
@@ -18,3 +18,6 @@ script:
   - coverage run --include='viabel/[A-Za-z]*.py' -m pytest
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
+
+
+
