@@ -44,7 +44,7 @@ setup(
     extras_require={ 'docs' : get_requirements_docs(),
                      'dev' : get_requirements_dev()
                      },
-    python_requires='>=3.9',
+    python_requires='>=3.8',
     classifiers=['Programming Language :: Python :: 3',
                  'Natural Language :: English',
                  'License :: OSI Approved :: MIT License',
