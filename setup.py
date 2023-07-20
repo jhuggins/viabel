@@ -31,7 +31,7 @@ def get_long_description():
 
 setup(
     name = 'viabel',
-    version='0.5.1',
+    version='0.5.2',
     description='Efficient, lightweight variational inference and approximation bounds',
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
@@ -44,7 +44,7 @@ setup(
     extras_require={ 'docs' : get_requirements_docs(),
                      'dev' : get_requirements_dev()
                      },
-    python_requires='>=3.5',
+    python_requires='>=3.9',
     classifiers=['Programming Language :: Python :: 3',
                  'Natural Language :: English',
                  'License :: OSI Approved :: MIT License',
