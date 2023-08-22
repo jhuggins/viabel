@@ -23,4 +23,3 @@ python:
   install:
     - method: pip
       path: .[docs]
-  system_packages: true
