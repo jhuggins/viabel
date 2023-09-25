@@ -202,10 +202,16 @@ class ExclusiveKL(StochasticVariationalObjective):
                 def hvp_for_v(v):
                     return hessian_vector_product(f, x, v)
                 return hvp_for_v
+            
+            def elementwise_grad(fun):
+                def grad_fun(x):
+                    _, g = jvp(fun, (x,), (np.ones_like(x),))
+                    return g
+                return grad_fun
             # estimate grad and hessian
-            #grad_f = elementwise_grad(self.model)
+            grad_f = elementwise_grad(self.model)
             grad_f_single = grad(f_model)
-            _, dLdm = jvp(self.model, (z_samples,), (np.ones_like(z_samples),))
+            dLdm = grad_f(z_samples)
             # log-std
             # dLds = dLdm * epsilon_sample + 1 / s_scale
             dLdlns = dLdm * epsilon_sample * s_scale + 1
@@ -215,7 +221,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             if self.hessian_approx_method == "full":
                 hessian_f = hessian(f_model)
                 # Miller's implementation
-                _, gmu = jvp(self.model, (m_mean,), (np.ones_like(m_mean),))
+                gmu = grad_f(m_mean)
                 H = hessian_f(m_mean).squeeze()
                 Hdiag = np.diag(H)
                 # construct normal approx samples of data term
@@ -232,7 +238,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             elif self.hessian_approx_method == "mean_only":
                 # linear approximation of gradient: mean
                 scaled_samples = np.multiply(s_scale, epsilon_sample)
-                _, a = jvp(self.model, (m_mean * np.ones_like(z_samples),), (np.ones_like(m_mean * np.ones_like(z_samples)),))
+                a = grad_f(m_mean * np.ones_like(z_samples))
                 hvp = make_hvp(f_model)(m_mean)
                 b = np.array([hvp[0](s) for s in scaled_samples])
                 g_tilde_mean_approx = a + b
@@ -284,7 +290,6 @@ class ExclusiveKL(StochasticVariationalObjective):
             else:
                 raise RuntimeError("Invalid hessian approximation method!")
             return -lower_bound, -g_hat_rv
-
         self._objective_and_grad = RGE
 
     def _hessian_vector_product(self, var_param, x):
