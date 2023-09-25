@@ -183,7 +183,8 @@ class ExclusiveKL(StochasticVariationalObjective):
             epsilon_sample = (z_samples - m_mean) / s_scale
             # elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
             if self._use_path_deriv:
-                var_param_stopped = getval(var_param)
+                var_param_stopped = var_param.primal
+                var_param_stopped = device_get(var_param_stopped)
                 lower_bound = np.mean(
                     self.model(z_samples) - approx.log_density(var_param_stopped, z_samples))
             elif approx.supports_entropy:
@@ -439,9 +440,9 @@ class DISInclusiveKL(StochasticVariationalObjective):
                 rng = random.PRNGKey(0)
                 indices = choice(key=rng, a=self.num_mc_samples,
                                            size=self._resampling_batch_size, p=self._state_w_normalized)
-                samples_resampled = self._state_samples[indices]
-
-                obj = np.mean(-approx.log_density(var_param, getval(samples_resampled)))
+                samples_resampled = (self._state_samples[indices]).primal
+                
+                obj = np.mean(-approx.log_density(var_param, device_get(samples_resampled)))
                 state_w_sum = self._state_w_sum.primal
 
                 return obj * device_get(state_w_sum) / self.num_mc_samples
