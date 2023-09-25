@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 
-import autograd.numpy as np
-import autograd.numpy.random as npr
-from autograd import value_and_grad, vector_jacobian_product, make_hvp, elementwise_grad, grad, hessian
-from autograd.core import getval
+import jax.numpy as np
+import numpy.random as npr
+from jax import value_and_grad, vjp, grad, random, hessian
+from functools import partial
+from jax import device_get
 
 __all__ = [
     'VariationalObjective',
@@ -154,7 +155,8 @@ class ExclusiveKL(StochasticVariationalObjective):
             def variational_objective(var_param):
                 samples = approx.sample(var_param, self.num_mc_samples)
                 if self._use_path_deriv:
-                    var_param_stopped = getval(var_param)
+                    var_param_stopped = var_param.primal
+                    var_param_stopped = device_get(var_param_stopped)
                     lower_bound = np.mean(
                         self.model(samples) - approx.log_density(var_param_stopped, samples))
                 elif approx.supports_entropy:
@@ -163,7 +165,14 @@ class ExclusiveKL(StochasticVariationalObjective):
                     lower_bound = np.mean(self.model(samples) - approx.log_density(samples))
                 return -lower_bound
 
-            self._hvp = make_hvp(variational_objective)
+            def hessian_vector_product(f, x, v):
+                return grad(lambda x: np.vdot(grad(f)(x), v))(x)
+            
+            def make_hvp(f,x):
+                def hvp_for_v(v):
+                    return hessian_vector_product(f, x, v)
+                return hvp_for_v
+            self._hvp = partial(make_hvp, variational_objective)
             self._objective_and_grad = value_and_grad(variational_objective)
             return
 
@@ -387,10 +396,25 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
     def _update_objective_and_grad(self):
         approx = self.approx
+        
+        def choice(key, a, p, size=None):
+            """Sample from a with probabilities p using JAX"""
+            cdf = np.cumsum(p)
+            if isinstance(a, int):
+                a = np.arange(a)
+                if p is None:
+                    p = np.ones(a.shape) / a.size
+            if size is None:
+                random_values = random.uniform(key)
+            else:
+                random_values = random.uniform(key, shape=(size,))
+            indices = np.searchsorted(cdf, random_values)
+            return a[indices]
 
         def variational_objective(var_param):
             if not self._use_resampling or self._objective_step % self._num_resampling_batches == 0:
-                self._state_samples = getval(approx.sample(var_param, self.num_mc_samples))
+                state_samples = approx.sample(var_param, self.num_mc_samples).primal
+                self._state_samples = device_get(state_samples)
                 self._state_log_q = approx.log_density(var_param, self._state_samples)
                 self._state_log_p_unnormalized = self.model(self._state_samples)
 
@@ -403,15 +427,18 @@ class DISInclusiveKL(StochasticVariationalObjective):
             self._objective_step += 1
 
             if not self._use_resampling:
-                return -np.inner(getval(self._state_w_clipped), self._state_log_q) / self.num_mc_samples
+                state_w = self._state_w_clipped.primal
+                return -np.inner(evice_get(state_w), self._state_log_q) / self.num_mc_samples
             else:
-                indices = np.random.choice(self.num_mc_samples,
-                                           size=self._resampling_batch_size, p=getval(self._state_w_normalized))
+                rng = random.PRNGKey(0)
+                indices = choice(key=rng, a=self.num_mc_samples,
+                                           size=self._resampling_batch_size, p=self._state_w_normalized)
                 samples_resampled = self._state_samples[indices]
 
                 obj = np.mean(-approx.log_density(var_param, getval(samples_resampled)))
+                state_w_sum = self._state_w_sum.primal
 
-                return obj * getval(self._state_w_sum) / self.num_mc_samples
+                return obj * device_get(state_w_sum) / self.num_mc_samples
 
         self._objective_and_grad = value_and_grad(variational_objective)
 
@@ -445,19 +472,23 @@ class AlphaDivergence(StochasticVariationalObjective):
             log_weights = self.model(samples) - self.approx.log_density(var_param, samples)
             return log_weights
 
-        log_weights_vjp = vector_jacobian_product(compute_log_weights)
+        #log_weights_vjp = vector_jacobian_product(compute_log_weights)
         alpha = self.alpha
 
         # manually compute objective and gradient
 
         def objective_grad_and_log_norm(var_param):
             # must create a shared seed!
-            seed = npr.randint(2 ** 32)
+            seed = npr.randint(2**32)
             log_weights = compute_log_weights(var_param, seed)
+            
+            unary_compute_log_weights = partial(compute_log_weights, seed=seed)
+            _, log_weights_vjp = vjp(unary_compute_log_weights, var_param)
             log_norm = np.max(log_weights)
-            scaled_values = np.exp(log_weights - log_norm) ** alpha
+            scaled_values = np.exp(log_weights - log_norm)**alpha
+            log_weights_gradient = log_weights_vjp(scaled_values)[0]
             obj_value = np.log(np.mean(scaled_values)) / alpha + log_norm
-            obj_grad = alpha * log_weights_vjp(var_param, seed, scaled_values) / scaled_values.size
+            obj_grad = alpha * log_weights_gradient / scaled_values.size
             return (obj_value, obj_grad)
 
         self._objective_and_grad = objective_grad_and_log_norm
