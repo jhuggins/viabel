@@ -1,7 +1,7 @@
-import autograd.numpy as anp
+import jax.numpy as jnp
 import numpy as np
 import pytest
-from autograd import grad
+from jax import grad
 
 from viabel.optimization import (
     RAABBVI, FASO, Adagrad, RMSProp, Adam,
@@ -22,7 +22,7 @@ class DummyObjective:
 
     def __init__(self, target, noise=1, scales=1):
         self._noise = noise
-        self.objective_fun = lambda x: .5 * anp.sum(((x - target) / scales)**2)
+        self.objective_fun = lambda x: .5 * jnp.sum(((x - target) / scales)**2)
         self.grad_objective_fun = grad(self.objective_fun)
         self.approx = DummyApproximationFamily()
         self.update = lambda x,y: x - y
