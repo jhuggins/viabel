@@ -4,11 +4,12 @@ import shutil
 import time
 from hashlib import md5
 
-import autograd.numpy as np
+import jax.numpy as np
 import pystan
 
 
 def vectorize_if_needed(f, a, axis=-1):
+    a = np.asarray(a, dtype='float64')
     if a.ndim > 1:
         return np.apply_along_axis(f, axis, a)
     else:
