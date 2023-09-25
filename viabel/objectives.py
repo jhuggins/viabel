@@ -195,7 +195,13 @@ class ExclusiveKL(StochasticVariationalObjective):
             def f_model(x):
                 x = np.atleast_2d(x)
                 return self._model(x)
-
+            def hessian_vector_product(f, x, v):
+                return grad(lambda x: np.vdot(grad(f)(x), v))(x)
+        
+            def make_hvp(f,x):
+                def hvp_for_v(v):
+                    return hessian_vector_product(f, x, v)
+                return hvp_for_v
             # estimate grad and hessian
             grad_f = elementwise_grad(self.model)
             grad_f_single = grad(f_model)
