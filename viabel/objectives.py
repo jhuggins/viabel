@@ -183,8 +183,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             epsilon_sample = (z_samples - m_mean) / s_scale
             # elbo = np.mean(self._model(z_samples) - approx.log_density(var_param, z_samples))
             if self._use_path_deriv:
-                var_param_stopped = var_param.primal
-                var_param_stopped = device_get(var_param_stopped)
+                var_param_stopped = device_get(var_param)
                 lower_bound = np.mean(
                     self.model(z_samples) - approx.log_density(var_param_stopped, z_samples))
             elif approx.supports_entropy:
@@ -204,9 +203,9 @@ class ExclusiveKL(StochasticVariationalObjective):
                     return hessian_vector_product(f, x, v)
                 return hvp_for_v
             # estimate grad and hessian
-            grad_f = elementwise_grad(self.model)
+            #grad_f = elementwise_grad(self.model)
             grad_f_single = grad(f_model)
-            dLdm = grad_f(z_samples)
+            _, dLdm = jvp(self.model, (z_samples,), (np.ones_like(z_samples),))
             # log-std
             # dLds = dLdm * epsilon_sample + 1 / s_scale
             dLdlns = dLdm * epsilon_sample * s_scale + 1
@@ -216,7 +215,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             if self.hessian_approx_method == "full":
                 hessian_f = hessian(f_model)
                 # Miller's implementation
-                gmu = grad_f(m_mean)
+                _, gmu = jvp(self.model, (m_mean,), (np.ones_like(m_mean),))
                 H = hessian_f(m_mean).squeeze()
                 Hdiag = np.diag(H)
                 # construct normal approx samples of data term
@@ -233,7 +232,7 @@ class ExclusiveKL(StochasticVariationalObjective):
             elif self.hessian_approx_method == "mean_only":
                 # linear approximation of gradient: mean
                 scaled_samples = np.multiply(s_scale, epsilon_sample)
-                a = grad_f(m_mean * np.ones_like(z_samples))
+                _, a = jvp(self.model, (m_mean * np.ones_like(z_samples),), (np.ones_like(m_mean * np.ones_like(z_samples)),))
                 hvp = make_hvp(f_model)(m_mean)
                 b = np.array([hvp[0](s) for s in scaled_samples])
                 g_tilde_mean_approx = a + b
