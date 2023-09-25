@@ -317,7 +317,11 @@ def _get_mu_sigma_pattern(dim):
     ms_pattern['Sigma'] = PSDSymmetricMatrixPattern(size=dim)
     return ms_pattern
 
-
+def sqrtm(matrix):
+    _, v = np.linalg.eigh(matrix)
+    sqrt_matrix = np.dot(v, np.dot(np.diag(np.sqrt(np.abs(_))), np.linalg.inv(v)))
+    return sqrt_matrix
+    
 class MultivariateT(ApproximationFamily):
     """A full-rank multivariate t approximation family."""
 
