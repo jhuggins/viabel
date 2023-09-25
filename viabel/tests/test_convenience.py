@@ -1,7 +1,7 @@
-import autograd.numpy as anp
+import jax.numpy as jnp
 import numpy as np
 import pytest
-from autograd.scipy.stats import norm
+from jax.scipy.stats import norm
 
 from viabel import convenience
 from viabel.models import Model
@@ -13,7 +13,7 @@ def test_bbvi():
     stdev = np.array([2., 5.])[np.newaxis, :]
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+        return jnp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     # use large number of MC samples to ensure accuracy
     for adaptive in [True, False]:
         if adaptive:
@@ -50,7 +50,7 @@ def test_vi_diagnostics():
     np.random.seed(153)
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x), axis=1)
+        return jnp.sum(norm.logpdf(x), axis=1)
     results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100)
     diagnostics = convenience.vi_diagnostics(results['opt_param'],
                                              objective=results['objective'])
@@ -58,7 +58,7 @@ def test_vi_diagnostics():
     assert diagnostics['d2'] < 0.1
 
     def log_p2(x):
-        return anp.sum(norm.logpdf(x, scale=3), axis=1)
+        return jnp.sum(norm.logpdf(x, scale=3), axis=1)
     model2 = Model(log_p2)
     diagnostics2 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
@@ -67,7 +67,7 @@ def test_vi_diagnostics():
     assert 'd2' not in diagnostics2
 
     def log_p3(x):
-        return anp.sum(norm.logpdf(x, scale=.5), axis=1)
+        return jnp.sum(norm.logpdf(x, scale=.5), axis=1)
     model3 = Model(log_p3)
     diagnostics3 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
