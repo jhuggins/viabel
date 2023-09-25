@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 
-import autograd.numpy as np
+import jax.numpy as np
 import tqdm
-
+import numpy as npy
+import stan
+import os
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer, StanModel_cache
 from viabel.approximations import MFGaussian
@@ -107,7 +109,8 @@ class StochasticGradientOptimizer(Optimizer):
                     if self._diagnostics:
                         results['descent_dir_history'].append(descent_dir)
                     if k % 10 == 0:
-                        avg_loss = np.mean(results['value_history'][max(0, k - 1000):k + 1])
+                        value_history = np.array(results['value_history'])
+                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
                         progress.set_description(
                             'average loss = {:,.5g}'.format(avg_loss))
             except (KeyboardInterrupt, StopIteration):  # pragma: no cover
@@ -118,7 +121,8 @@ class StochasticGradientOptimizer(Optimizer):
         
         if iap is not None:
             window = max(1, int(k * iap))
-            results['opt_param'] = np.mean(results['variational_param_history'][-window:], axis=0)
+            vph = npy.array(results['variational_param_history'][-window:])
+            results['opt_param'] = np.mean(vph, axis=0)
         else:
             results['opt_param'] = variational_param.copy()
         # if descent_dir_history is not None:
@@ -551,8 +555,8 @@ class FASO(Optimizer):
                         W_upper = int(0.95 * k)
                         if W_upper > self._W_min:
                             windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
-                            R_hat_success, best_W = R_hat_convergence_check(
-                                history['variational_param_history'], windows)
+                            vph = np.array(history['variational_param_history'])
+                            R_hat_success, best_W = R_hat_convergence_check(vph, windows)
                             iterate_average = np.mean(history['variational_param_history'][-best_W:], axis=0)
                             if diagnostics:
                                 history['iterate_average_k_history'].append(k)
@@ -604,7 +608,8 @@ class FASO(Optimizer):
                             recheck_scale = max(1.05, 1 + 1 / np.sqrt(1 + relative_time_ratio))
                             W_check = int(recheck_scale * W_check + 1)
                     if k % self._k_check == 0:
-                        avg_loss = np.mean(history['value_history'][max(0, k - 1000):k + 1])
+                        value_history = npy.array(history['value_history'])
+                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
                         R_conv = 'converged' if k_conv is not None else 'not converged'
                         progress.set_description(
                             'average loss = {:,.5g} | R hat {}|'.format(avg_loss, R_conv))
@@ -707,15 +712,22 @@ class RAABBVI(FASO):
                 return dict(log_c=log_c, sigma=sigma)
             else:
                 return dict(kappa=kappa, log_c=log_c, sigma=sigma)
+        
+        def _data_file_path(filename):
+            """Returns the path to an internal file"""
+            return os.path.abspath(os.path.join(__file__, '../stan_models', filename))
         N = len(y)
-        w = np.array(1/(1 + np.arange(N)[::-1]**2/s)**a) #weights
+        w = npy.array(1/(1 + npy.arange(N)[::-1]**2/s)**a) #weights
         data = dict(N=N, y=y, x=x, rho=self._rho, w=w) #data
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
               init = [initfun(100, 5, chain_id=i) for i in range(n_chains) ] #initial values
         else:
             init = [initfun(100, 5, 0.8, chain_id=i) for i in range(n_chains) ] #initial values
-        fit = model.sampling(data=data, init=init, iter=1000, chains=n_chains,
-                             control=dict(adapt_delta=0.98)) #sampling from the model
+        model_file = _data_file_path(model_name + '.stan')
+        with open(model_file) as f:
+            model_code = f.read()
+        model = stan.build(program_code=model_code, data=data)
+        fit = model.sample(num_chains=n_chains, num_samples=1000,init = init) #sampling from the model
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
         else:
@@ -872,8 +884,10 @@ class RAABBVI(FASO):
                         # Conduct weighted linear regression to estimate parameters
                         # of SKL hat
                         if len(history['SKL_history']) > 0:
-                            y_wlr = np.log(history['SKL_history'])
-                            x_wlr = np.log(history['learning_rate_hist'])
+                            skl_history = npy.array(history['SKL_history'])
+                            y_wlr = npy.log(skl_history)
+                            learning_hist = npy.array(history['learning_rate_hist'])
+                            x_wlr = npy.log(learning_hist)
                             fit, kappa, c = self.weighted_linear_regression(reg_model, y_wlr, x_wlr)
                             if diagnostics:
                                 history['c_sample_hist'].append(np.exp(fit['log_c']))
@@ -890,15 +904,17 @@ class RAABBVI(FASO):
                                 (self._accuracy_threshold/(np.sqrt(c) *
                                        history['learning_rate_hist'][-1]**kappa))
                                 curr_iters = history['conv_iters_hist'][-1]
-                                _, slope = self.wls(np.log(history['learning_rate_hist']),
-                                                    np.log(history['conv_iters_hist']))
+                                learning_hist = npy.array(history['learning_rate_hist'])
+                                conv_iter = npy.array(history['conv_iters_hist'])
+                                _, slope = self.wls(np.log(learning_hist),
+                                                    np.log(conv_iter))
                                 trend_check = self.convg_iteration_trend_detection(slope)
                                 if trend_check: #if negative relationship use all observations
-                                    y_wls = history['conv_iters_hist']
-                                    x_wls = history['learning_rate_hist']   
+                                    y_wls = np.array(history['conv_iters_hist'])
+                                    x_wls = np.array(history['learning_rate_hist'])
                                 else: #remove the initial observation
-                                    y_wls = history['conv_iters_hist'][1:]
-                                    x_wls = history['learning_rate_hist'][1:]
+                                    y_wls = np.array(history['conv_iters_hist'][1:])
+                                    x_wls = np.array(history['learning_rate_hist'][1:])
                                 b0, b1 = self.wls(np.log(x_wls), np.log(y_wls))
                                 pred_iters = int(np.exp(b0) * \
                                         (self._rho * history['learning_rate_hist'][-1])**b1)
