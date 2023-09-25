@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.stats import norm
-
+import pytest
 from viabel.approximations import MFGaussian, MFStudentT
 from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL
 from viabel.optimization import RMSProp
