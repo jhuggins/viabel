@@ -5,7 +5,7 @@ import time
 from hashlib import md5
 
 import jax.numpy as np
-import pystan
+import stan
 
 
 def vectorize_if_needed(f, a, axis=-1):
@@ -52,32 +52,19 @@ def clear_stan_model_cache():
         shutil.rmtree(stan_model_dir)
 
 
-def StanModel_cache(model_code=None, model_name=None, **kwargs):
-    """Use just as you would `StanModel`"""
-    if model_code is None:
-        if model_name is None:
-            raise ValueError('Either model_code or model_name must be provided')
-        model_file = _data_file_path(model_name + '.stan')
-        if not os.path.isfile(model_file):
-            raise ValueError('invalid model "{}"'.format(model_name))
-        with open(model_file) as f:
-            model_code = f.read()
-    stan_model_dir = _stan_model_cache_dir()
-    os.makedirs(stan_model_dir, exist_ok=True)
-    code_hash = md5(model_code.encode('ascii')).hexdigest()
-    if model_name is None:
-        cache_fn = 'cached-model-{}.pck'.format(code_hash)
-    else:
-        cache_fn = 'cached-{}-{}.pck'.format(model_name, code_hash)
-    cache_file = os.path.join(stan_model_dir, cache_fn)
-    if os.path.exists(cache_file):
-        print('Using cached StanModel{}'.format('' if model_name is None
-                                                else ' for ' + model_name))
-        with open(cache_file, 'rb') as f:
-            sm = pickle.load(f)
-    else:
-        sm = pystan.StanModel(model_code=model_code, model_name=model_name)
-        with open(cache_file, 'wb') as f:
-            pickle.dump(sm, f)
+def StanModel_cache(model_name=None, data=None):
+    """Get or compile a BridgeStan model."""
 
-    return sm
+    if not model_name:
+        raise ValueError("Model name must be provided.")
+
+    stan_file = _data_file_path(f"{model_name}.stan")
+    model_lib_path = os.path.join(_stan_model_cache_dir(), f"{model_name}.so")
+    if not os.path.exists(model_lib_path):
+        compiled_path = bs.compile_model(stan_file)
+        os.rename(compiled_path, model_lib_path)
+    if data:
+        model = bs.StanModel(model_lib=model_lib_path, model_data=data)
+    else:
+        model = bs.StanModel(model_lib=model_lib_path)
+    return model
