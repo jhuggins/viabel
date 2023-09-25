@@ -414,17 +414,19 @@ class NeuralNet(ApproximationFamily):
 
     def forward(self, var_param, x):
         log_det_J = np.zeros(x.shape[0])
-        derivative = elementwise_grad(self._nonlinearity)
-        derivative_last = elementwise_grad(self._last)
         for layer_id in range(self._layers):
             W = var_param[str(layer_id)]
             b = var_param[str(layer_id) + "_b"]
             if layer_id + 1 == self._layers:
                 x = self._last(np.dot(x, W) + b)
-                log_det_J += np.log(np.abs(np.dot(derivative_last(x), W.T).sum(axis=1)))
+                _, elementwise_gradient_last = jvp(self._last, (x,), (np.ones_like(x),))
+
+                log_det_J += np.log(np.abs(np.dot(elementwise_gradient_last, W.T).sum(axis=1)))
             else:
                 x = self._nonlinearity(np.dot(x, W) + b)
-                log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis=1)))
+                _, elementwise_gradient = jvp(self._nonlinearity, (x,), (np.ones_like(x),))
+
+                log_det_J += np.log(np.abs(np.dot(elementwise_gradient, W.T).sum(axis=1)))
         return x, log_det_J
 
     def sample(self, var_param, n_samples):
