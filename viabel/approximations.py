@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
 
-import autograd.numpy as np
-import autograd.numpy.random as npr
-import autograd.scipy.stats.norm as norm
-import autograd.scipy.stats.t as t_dist
-from autograd import elementwise_grad
-from autograd.scipy.linalg import sqrtm
-from paragami import (
+import jax.numpy as np
+import numpy.random as npr
+import jax.scipy.stats.norm as norm
+import jax.scipy.stats.t as t_dist
+from jax import jvp
+from jax_paragami import (
     FlattenFunctionInput, NumericArrayPattern, NumericVectorPattern, PatternDict,
     PSDSymmetricMatrixPattern)
 
-from ._distributions import multivariate_t_logpdf
+from viabel._distributions import multivariate_t_logpdf
 
 __all__ = [
     'ApproximationFamily',
