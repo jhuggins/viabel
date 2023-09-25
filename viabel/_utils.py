@@ -6,6 +6,7 @@ from hashlib import md5
 
 import jax.numpy as np
 import stan
+import bridgestan as bs
 
 
 def vectorize_if_needed(f, a, axis=-1):
