@@ -1,7 +1,6 @@
-import autograd.numpy as anp
+import jax.numpy as jnp
 import numpy as np
-import pytest
-from autograd.scipy.stats import norm
+from jax.scipy.stats import norm
 
 from viabel.approximations import MFGaussian, MFStudentT
 from viabel.objectives import AlphaDivergence, DISInclusiveKL, ExclusiveKL
@@ -16,7 +15,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     stdev = np.array([2., 5.])[np.newaxis, :]
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+        return jnp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
 
     approx = MFStudentT(2, 100)
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
