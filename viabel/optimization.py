@@ -557,7 +557,7 @@ class FASO(Optimizer):
                             windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
                             vph = np.array(history['variational_param_history'])
                             R_hat_success, best_W = R_hat_convergence_check(vph, windows)
-                            iterate_average = np.mean(history['variational_param_history'][-best_W:], axis=0)
+                            iterate_average = np.mean(vph[-best_W:], axis=0)
                             if diagnostics:
                                 history['iterate_average_k_history'].append(k)
                                 history['iterate_average_history'].append(iterate_average)
