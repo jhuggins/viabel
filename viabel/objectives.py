@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import jax.numpy as np
 import numpy.random as npr
-from jax import value_and_grad, vjp, grad, random, hessian, jvp
+from jax import value_and_grad, vjp, grad, random, hessian, jacobian
 from functools import partial
 from jax import device_get
 
