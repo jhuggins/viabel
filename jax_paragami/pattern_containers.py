@@ -450,7 +450,7 @@ class PatternArray(Pattern):
         self.__array_shape = tuple(array_shape)
         self.__array_ranges = [range(0, t) for t in self.__array_shape]
 
-        num_elements = np.prod(self.__array_shape)
+        num_elements = np.prod(np.array(self.__array_shape))
         self.__base_pattern = base_pattern
 
         empty_pattern = self.__base_pattern.empty(valid=False)
