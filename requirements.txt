@@ -1,6 +1,6 @@
 numpy>=1.13
 scipy~=1.7.3
-jax>=0.4.14
+jax>=0.4.1
 tqdm~=4.64.1
 bridgestan>=2.0.0
 pystan>=3.1.0
