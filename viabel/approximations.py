@@ -5,7 +5,7 @@ import numpy.random as npr
 import jax.scipy.stats.norm as norm
 import jax.scipy.stats.t as t_dist
 from jax import jvp
-from jax_paragami import (
+from viabel.jax_paragami import (
     FlattenFunctionInput, NumericArrayPattern, NumericVectorPattern, PatternDict,
     PSDSymmetricMatrixPattern)
 
