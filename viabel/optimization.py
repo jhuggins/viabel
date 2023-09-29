@@ -121,7 +121,7 @@ class StochasticGradientOptimizer(Optimizer):
         
         if iap is not None:
             window = max(1, int(k * iap))
-            vph = npy.array(results['variational_param_history'][-window:])
+            vph = np.array(results['variational_param_history'][-window:])
             results['opt_param'] = np.mean(vph, axis=0)
         else:
             results['opt_param'] = variational_param.copy()
@@ -608,7 +608,7 @@ class FASO(Optimizer):
                             recheck_scale = max(1.05, 1 + 1 / np.sqrt(1 + relative_time_ratio))
                             W_check = int(recheck_scale * W_check + 1)
                     if k % self._k_check == 0:
-                        value_history = npy.array(history['value_history'])
+                        value_history = np.array(history['value_history'])
                         avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
                         R_conv = 'converged' if k_conv is not None else 'not converged'
                         progress.set_description(
@@ -718,7 +718,7 @@ class RAABBVI(FASO):
             return os.path.abspath(os.path.join(__file__, '../stan_models', filename))
         N = len(y)
         w = npy.array(1/(1 + npy.arange(N)[::-1]**2/s)**a) #weights
-        data = dict(N=N, y=y, x=x, rho=self._rho, w=w) #data
+        data = dict(N=npy.array(N), y=y, x=x, rho=npy.array(self._rho), w=w) #data
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
               init = [initfun(100, 5, chain_id=i) for i in range(n_chains) ] #initial values
         else:
@@ -904,8 +904,8 @@ class RAABBVI(FASO):
                                 (self._accuracy_threshold/(np.sqrt(c) *
                                        history['learning_rate_hist'][-1]**kappa))
                                 curr_iters = history['conv_iters_hist'][-1]
-                                learning_hist = npy.array(history['learning_rate_hist'])
-                                conv_iter = npy.array(history['conv_iters_hist'])
+                                learning_hist = np.array(history['learning_rate_hist'])
+                                conv_iter = np.array(history['conv_iters_hist'])
                                 _, slope = self.wls(np.log(learning_hist),
                                                     np.log(conv_iter))
                                 trend_check = self.convg_iteration_trend_detection(slope)
