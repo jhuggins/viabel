@@ -5,7 +5,7 @@ import time
 from hashlib import md5
 
 import jax.numpy as np
-import stan
+
 import bridgestan as bs
 
 
