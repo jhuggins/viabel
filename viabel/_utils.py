@@ -54,18 +54,27 @@ def clear_stan_model_cache():
 
 
 def StanModel_cache(model_name=None, data=None):
-    """Get or compile a BridgeStan model."""
+    """Get or compile a BridgeStan model with caching functionality."""
 
     if not model_name:
         raise ValueError("Model name must be provided.")
 
     stan_file = _data_file_path(f"{model_name}.stan")
-    model_lib_path = os.path.join(_stan_model_cache_dir(), f"{model_name}.so")
-    if not os.path.exists(model_lib_path):
-        compiled_path = bs.compile_model(stan_file)
-        os.rename(compiled_path, model_lib_path)
-    if data:
+    with open(stan_file, 'r') as f:
+        model_code = f.read()
+    code_hash = md5(model_code.encode('ascii')).hexdigest()
+
+    model_lib_path = os.path.join(_stan_model_cache_dir(), f"{model_name}-{code_hash}.so")
+    pickle_path = os.path.join(_stan_model_cache_dir(), f"{model_name}-{code_hash}.pck")
+
+    if os.path.exists(pickle_path):
+        print('Using cached StanModel{}'.format('' if model_name is None
+                                        else ' for ' + model_name))
+        with open(pickle_path, 'rb') as f:
+            return pickle.load(f)
+    else:    
         model = bs.StanModel(model_lib=model_lib_path, model_data=data)
-    else:
-        model = bs.StanModel(model_lib=model_lib_path)
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(model, f)
+
     return model
