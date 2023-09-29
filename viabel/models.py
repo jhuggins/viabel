@@ -84,7 +84,7 @@ def _make_stan_log_density(fitobj):
         return vectorize_if_needed(fitobj.log_density, x)
 
     def log_density_fwd(x):
-        x = np.asarray(x, dtype='float64')
+        x = np.asarray(x)
         value, grad = vectorize_if_needed(fitobj.log_density_gradient, x)
         return log_density(x), grad
 
