@@ -6,7 +6,7 @@ import numpy as npy
 import stan
 import os
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
-from viabel._utils import Timer, StanModel_cache
+from viabel._utils import Timer
 from viabel.approximations import MFGaussian
 from collections import defaultdict
 
@@ -679,7 +679,7 @@ class RAABBVI(FASO):
         if rho < 0 or rho > 1:
             raise ValueError('"rho" must be between zero and one')
 
-    def weighted_linear_regression(self, model, y, x, s=9, a=0.25, n_chains=4):
+    def weighted_linear_regression(self, model_name, y, x, s=9, a=0.25, n_chains=4):
         """
         weighted regression with likelihood term having the weight
         Parameters
@@ -812,9 +812,9 @@ class RAABBVI(FASO):
         sgo = self._sgo
         diagnostics = self._sgo._diagnostics
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
-            reg_model = StanModel_cache(model_name='weighted_lin_regression_sgd')
+            reg_model = 'weighted_lin_regression_sgd'
         else:
-            reg_model = StanModel_cache(model_name='weighted_lin_regression')
+            reg_model = 'weighted_lin_regression'
         iterate_average_curr = init_param.copy()
         history = defaultdict(list)
         history['iterate_average_curr_hist'].append(iterate_average_curr)
