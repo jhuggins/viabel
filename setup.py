@@ -1,6 +1,6 @@
 import codecs
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 REQUIREMENTS_FILE = os.path.join(PROJECT_ROOT, "requirements.txt")
@@ -38,7 +38,7 @@ setup(
     author='Jonathan H. Huggins',
     author_email='huggins@bu.edu',
     url='https://github.com/jhuggins/viabel/',
-    packages=['viabel'],
+    packages=find_packages(),
     include_package_data=True,
     install_requires=get_requirements(),
     extras_require={ 'docs' : get_requirements_docs(),
