@@ -475,7 +475,7 @@ class WindowedAdagrad(StochasticGradientOptimizer):
         self._history.append(grad**2)
         if len(self._history) > self._window_size:
             self._history.pop(0)
-        mean_grad_squared = np.mean(self._history, axis=0)
+        mean_grad_squared = np.mean(np.array(self._history), axis=0)
         descent_dir = grad / np.sqrt(self._jitter + mean_grad_squared)
         return descent_dir
 
