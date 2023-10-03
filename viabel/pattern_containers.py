@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import itertools
-
+import numbers
 import json
 from scipy.sparse import block_diag
 import numpy as npy
@@ -548,11 +548,13 @@ class PatternArray(Pattern):
 
     def fold(self, flat_val, free=None, validate_value=None):
         free = self._free_with_default(free)
-        if not isinstance(flat_val, np.ndarray):
+        if isinstance(flat_val, npy.ndarray) or isinstance(flat_val, numbers.Number):
+            flat_val = np.atleast_1d(flat_val)
+        elif isinstance(flat_val, np.ndarray):
+            flat_val = jax.device_get(flat_val)
+        else:
             primal_flat_val = flat_val.primal
             flat_val = jax.device_get(primal_flat_val)
-            flat_val = np.atleast_1d(flat_val)
-        else:
             flat_val = np.atleast_1d(flat_val)
 
         if len(flat_val.shape) != 1:
