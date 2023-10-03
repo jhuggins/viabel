@@ -5,9 +5,10 @@ import numpy.random as npr
 import jax.scipy.stats.norm as norm
 import jax.scipy.stats.t as t_dist
 from jax import jvp
-from viabel.jax_paragami import (
-    FlattenFunctionInput, NumericArrayPattern, NumericVectorPattern, PatternDict,
-    PSDSymmetricMatrixPattern)
+from viabel.function_patterns import FlattenFunctionInput
+from viabel.numeric_array_patterns import NumericArrayPattern, NumericVectorPattern
+from viabel.pattern_containers import PatternDict
+from viabel.psdmatrix_patterns import PSDSymmetricMatrixPattern
 
 from viabel._distributions import multivariate_t_logpdf
 
