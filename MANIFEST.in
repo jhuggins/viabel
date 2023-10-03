@@ -5,5 +5,4 @@ recursive-exclude * *.py[co]
 
 include viabel/data/*.stan
 
-recursive-include jax_paragami *
 
