@@ -37,7 +37,7 @@ def _test_optimizer(opt_class, objective, true_value, n_iters, **kwargs):
     dim = true_value.size
     init_param = true_value + np.random.randn(dim) / np.sqrt(dim)
     results = opt_class.optimize(n_iters, objective, init_param)
-    np.testing.assert_almost_equal(results['opt_param'], true_value, decimal=2)
+    jnp.allclose(results['opt_param'], true_value)
 
 
 def test_sgo_optimize():
