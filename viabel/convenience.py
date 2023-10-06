@@ -11,7 +11,7 @@ all = [
 ]
 
 
-def bbvi(dimension, *, n_iters=2000, num_mc_samples=10, log_density=None,
+def bbvi(dimension, *, n_iters=3000, num_mc_samples=10, log_density=None,
          approx=None, objective=None, fit=None, adaptive=True, fixed_lr=False,
          init_var_param=None, learning_rate=0.01,
          RMS_kwargs=dict(), FASO_kwargs=dict(), RAABBVI_kwargs=dict()):
@@ -94,7 +94,7 @@ def bbvi(dimension, *, n_iters=2000, num_mc_samples=10, log_density=None,
     return opt_results
 
 
-def vi_diagnostics(var_param, *, objective=None, model=None, approx=None, n_samples=5000):
+def vi_diagnostics(var_param, *, objective=None, model=None, approx=None, n_samples=3000):
     """Check variational inference diagnostics.
 
     Check Pareto k and 2-divergence diagnostics. Return additional diagnostics
