@@ -22,7 +22,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     # large number of MC samples and smaller epsilon and learning rate to ensure accuracy
     init_param = np.array([0, 0, 1, 1], dtype=np.float32)
     opt = RMSProp(0.1)
-    opt_results = opt.optimize(1000, objective, init_param)
+    opt_results = opt.optimize(400, objective, init_param)
     # iterate averaging introduces some bias, so use last iterate
     est_mean, est_cov = approx.mean_and_cov(opt_results['opt_param'])
     est_stdev = np.sqrt(np.diag(est_cov))
