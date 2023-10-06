@@ -3,7 +3,7 @@ from viabel.approximations import MFGaussian
 from viabel.diagnostics import all_diagnostics
 from viabel.models import Model, StanModel
 from viabel.objectives import ExclusiveKL
-from viabel.optimization import RAABBVI, FASO, RMSProp
+from viabel.optimization import RAABBVI, FASO, RMSProp, AveragedRMSProp
 
 all = [
     'bbvi',
