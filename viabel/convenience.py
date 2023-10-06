@@ -80,7 +80,7 @@ def bbvi(dimension, *, n_iters=2000, num_mc_samples=10, log_density=None,
         objective = ExclusiveKL(approx, model, num_mc_samples)
     if init_var_param is None:
         init_var_param = approx.init_param()
-    base_opt = RMSProp(learning_rate, diagnostics=True, **RMS_kwargs)
+    base_opt = AveragedRMSProp(learning_rate, diagnostics=True, **RMS_kwargs)
     if adaptive and not fixed_lr:
         opt = RAABBVI(base_opt, **RAABBVI_kwargs)
     elif adaptive and fixed_lr:
