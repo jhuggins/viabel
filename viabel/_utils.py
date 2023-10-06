@@ -10,7 +10,6 @@ import bridgestan as bs
 
 
 def vectorize_if_needed(f, a, axis=-1):
-    a = np.array(a)
     if a.ndim > 1:
         return np.apply_along_axis(f, axis, a)
     else:
