@@ -40,14 +40,9 @@ def test_Model():
 
 
 def test_StanModel():
-    compiled_model_file = 'robust_reg_model.pkl'
-    try:
-        with open(compiled_model_file, 'rb') as f:
-            regression_model = pickle.load(f)
-    except FileNotFoundError:  # pragma: no cover
-        regression_model = bs.StanModel.from_stan_file('test_model.stan', 'test_model.data.json')
-        with open('robust_reg_model.pkl', 'wb') as f:
-            pickle.dump(regression_model, f)
+    
+    regression_model = bs.StanModel.from_stan_file('test_model.stan', 'test_model.data.json')
+
 
     fit = regression_model
     model = models.StanModel(fit)
