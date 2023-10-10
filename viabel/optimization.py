@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import jax.numpy as np
 import tqdm
+import os
 import numpy as npy
 import stan
 
@@ -23,61 +24,7 @@ __all__ = [
     'RAABBVI'
 ]
 
-weighted_lin_regression ="""data {
-   int<lower=0> N;
-   vector[N] y; // log(SKL)
-   vector[N] x; // log(\gamma) 
-   real<lower=0> rho;
-   vector[N] w; //weights
-}
 
-parameters {
-    real<lower=0,upper=1>  kappa; //power
-    real log_c; // log(c)
-    real<lower=0> sigma; // \sigma
-}
-
-model {
-    real mu;
-    
-    kappa ~ uniform(0,1);
-    log_c ~ cauchy(0,10);
-    sigma ~ cauchy(0,10);
-
-    for (n in 1:N) {
-        mu = log_c + 2*log((1/rho^kappa)-1) + 2*kappa*x[n];
-        target += normal_lpdf(y[n] | mu, sigma) * w[n];  
-    }     
-}"""
-
-weighted_lin_regression_sgd = """data {
-   int<lower=0> N;
-   vector[N] y; // log(SKL)
-   vector[N] x; // log(\gamma) 
-   real<lower=0> rho;
-   vector[N] w; //weights
-}
-
-parameters {
-    real log_c; // log(c)
-    real<lower=0> sigma; // \sigma
-}
-
-//transformed parameters {
- //   real<lower=0> c=exp(log_c);
-//}
-
-model {
-    real mu;
-    
-    log_c ~ cauchy(0,10);
-    sigma ~ cauchy(0,10);
-
-    for (n in 1:N) {
-        mu = log_c + 2*log((1/rho)-1) + 2*x[n];
-        target += normal_lpdf(y[n] | mu, sigma) * w[n];  
-    }     
-}"""
 
 class Optimizer(ABC):
     """An abstract class for optimization
@@ -734,7 +681,7 @@ class RAABBVI(FASO):
         if rho < 0 or rho > 1:
             raise ValueError('"rho" must be between zero and one')
 
-    def weighted_linear_regression(self, model_code, y, x, s=9, a=0.25, n_chains=4):
+    def weighted_linear_regression(self, model_name, y, x, s=9, a=0.25, n_chains=4):
         """
         weighted regression with likelihood term having the weight
         Parameters
@@ -771,6 +718,9 @@ class RAABBVI(FASO):
         def _data_file_path(filename):
             """Returns the path to an internal file"""
             return os.path.abspath(os.path.join(__file__, '../stan_models', filename))
+        model_file = _data_file_path(model_name + '.stan')
+        with open(model_file) as f:
+            model_code = f.read()
         N = len(y)
         w = npy.array(1/(1 + npy.arange(N)[::-1]**2/s)**a) #weights
         data = dict(N=npy.array(N), y=y, x=x, rho=npy.array(self._rho), w=w) #data
