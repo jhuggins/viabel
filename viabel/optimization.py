@@ -814,9 +814,9 @@ class RAABBVI(FASO):
         sgo = self._sgo
         diagnostics = self._sgo._diagnostics
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
-            reg_model = weighted_lin_regression_sgd
+            reg_model = 'weighted_lin_regression_sgd'
         else:
-            reg_model = weighted_lin_regression
+            reg_model = 'weighted_lin_regression'
         iterate_average_curr = init_param.copy()
         history = defaultdict(list)
         history['iterate_average_curr_hist'].append(iterate_average_curr)
