@@ -41,7 +41,7 @@ def test_Model():
 
 def test_StanModel():
     
-    regression_model = bs.StanModel.from_stan_file(stan_file='../data/test_model.stan', model_data='../data/test_model.data.json')
+    regression_model = bs.StanModel.from_stan_file(stan_file='..viabel//data/test_model.stan', model_data='..viabel/data/test_model.data.json')
 
 
     fit = regression_model
