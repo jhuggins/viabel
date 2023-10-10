@@ -717,7 +717,7 @@ class RAABBVI(FASO):
         
         def _data_file_path(filename):
             """Returns the path to an internal file"""
-            return os.path.abspath(os.path.join(__file__, '../stan_models', filename))
+            return os.path.abspath(os.path.join(__file__, '../data', filename))
         model_file = _data_file_path(model_name + '.stan')
         with open(model_file) as f:
             model_code = f.read()
