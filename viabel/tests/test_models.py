@@ -33,7 +33,7 @@ def test_Model():
     stdev = np.array([2., 5.])[np.newaxis, :]
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+        return jnp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     model = models.Model(log_p)
     x = 4 * np.random.randn(10, 2)
     _test_model(model, x, False, False)
