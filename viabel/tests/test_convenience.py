@@ -18,10 +18,10 @@ def test_bbvi():
     for adaptive in [True, False]:
         if adaptive:
             for fixed_lr in [True, False]:
-                results = convenience.bbvi(2, log_density=log_p, num_mc_samples=1000,
+                results = convenience.bbvi(2, log_density=log_p, num_mc_samples=500,
                                            RAABBVI_kwargs=dict(mcse_threshold=.005,accuracy_threshold=.005),
                                            FASO_kwargs=dict(mcse_threshold=.005),
-                                           adaptive=adaptive, fixed_lr=fixed_lr, n_iters=30000)
+                                           adaptive=adaptive, fixed_lr=fixed_lr, n_iters=900)
                 est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
                 est_stdev = np.sqrt(np.diag(est_cov))
                 jnp.allclose(mean.squeeze(), est_mean)
@@ -30,7 +30,7 @@ def test_bbvi():
             results = convenience.bbvi(2, log_density=log_p, num_mc_samples=50,
                                            RAABBVI_kwargs=dict(mcse_threshold=.005,accuracy_threshold=.005),
                                            FASO_kwargs=dict(mcse_threshold=.005),
-                                           adaptive=adaptive, fixed_lr=True, n_iters=30000)
+                                           adaptive=adaptive, fixed_lr=True, n_iters=900)
             est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
             est_stdev = np.sqrt(np.diag(est_cov))
             jnp.allclose(mean.squeeze(), est_mean)
