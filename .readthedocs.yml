@@ -12,15 +12,15 @@ sphinx:
 # Build documentation with MkDocs
 #mkdocs:
 #  configuration: mkdocs.yml
-build:
-  image: testing
+
 # Optionally build your docs in additional formats such as PDF
 #formats:
 #  - pdf
 
 # Optionally set the version of Python and requirements required to build your docs
-python:
-  version: 3.9
-  install:
-    - method: pip
-      path: .[docs]
+build:
+  tools:
+    python: "3.9"
+      install:
+        - method: pip
+          path: .[docs]
