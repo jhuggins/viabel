@@ -10,6 +10,7 @@ from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer
 from viabel.approximations import MFGaussian
 from collections import defaultdict
+import asyncio
 
 __all__ = [
     'Optimizer',
@@ -730,6 +731,7 @@ class RAABBVI(FASO):
             init = [initfun(100, 5, 0.8, chain_id=i) for i in range(n_chains) ] #initial values
         model = stan.build(program_code=model_code, data=data)
         fit = model.sample(num_chains=n_chains, num_samples=1000,init = init) #sampling from the model
+        asyncio.run(asyncio.sleep(1))
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
         else:
