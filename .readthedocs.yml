@@ -18,5 +18,13 @@ sphinx:
 #  - pdf
 
 # Optionally set the version of Python and requirements required to build your docs
-build:
-  image: testing
+
+python:
+  install:
+    - requirements: docs/requirements.txt
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+    - method: pip
+      path: another/package
