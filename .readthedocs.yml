@@ -26,5 +26,3 @@ python: "3.9"
       path: .
       extra_requirements:
         - docs
-    - method: pip
-      path: another/package
