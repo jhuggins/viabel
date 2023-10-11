@@ -5,8 +5,7 @@ from jax.scipy.stats import norm
 
 from viabel import convenience
 from viabel.models import Model
-import nest_asyncio
-nest_asyncio.apply()
+
 
 def test_bbvi():
     np.random.seed(851)
