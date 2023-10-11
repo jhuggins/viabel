@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
-import jax.numpy as np
+import jax.numpy as jnp
 import tqdm
 import os
-import numpy as npy
+import numpy as np
 import stan
 
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
@@ -111,8 +111,8 @@ class StochasticGradientOptimizer(Optimizer):
                     if self._diagnostics:
                         results['descent_dir_history'].append(descent_dir)
                     if k % 10 == 0:
-                        value_history = np.array(results['value_history'])
-                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        value_history = jnp.array(results['value_history'])
+                        avg_loss = jnp.mean(value_history[max(0, k - 1000):k + 1])
                         progress.set_description(
                             'average loss = {:,.5g}'.format(avg_loss))
             except (KeyboardInterrupt, StopIteration):  # pragma: no cover
@@ -123,13 +123,13 @@ class StochasticGradientOptimizer(Optimizer):
         
         if iap is not None:
             window = max(1, int(k * iap))
-            vph = np.array(results['variational_param_history'][-window:])
+            vph = jnp.array(results['variational_param_history'][-window:])
             results['opt_param'] = np.mean(vph, axis=0)
         else:
             results['opt_param'] = variational_param.copy()
         # if descent_dir_history is not None:
         #     results['descent_dir_history'] = descent_dir_history
-        results_dict = {d: np.array(h) for d, h in results.items()}
+        results_dict = {d: jnp.array(h) for d, h in results.items()}
         return results_dict
 
     def descent_direction(self, grad):
@@ -198,7 +198,7 @@ class RMSProp(StochasticGradientOptimizer):
             avg_grad_sq = self._avg_grad_sq
         avg_grad_sq *= self._beta
         avg_grad_sq += (1. - self._beta) * grad**2
-        descent_dir = grad / np.sqrt(self._jitter + avg_grad_sq)
+        descent_dir = grad / jnp.sqrt(self._jitter + avg_grad_sq)
         self._avg_grad_sq = avg_grad_sq
         return descent_dir
 
@@ -256,9 +256,9 @@ class AveragedRMSProp(StochasticGradientOptimizer):
         avg_grad_sq *= beta
         avg_grad_sq += (1.-beta)*grad**2
         if self._component_wise:
-            descent_dir = grad / np.sqrt(self._jitter+avg_grad_sq)
+            descent_dir = grad / jnp.sqrt(self._jitter+avg_grad_sq)
         else:
-            descent_dir = grad / np.sqrt(self._jitter+np.sum(avg_grad_sq))
+            descent_dir = grad / jnp.sqrt(self._jitter+jnp.sum(avg_grad_sq))
         self._avg_grad_sq = avg_grad_sq
         self._t = t
         return descent_dir
@@ -326,7 +326,7 @@ class Adam(StochasticGradientOptimizer):
         momentum += (1. - self._beta1) * grad
         avg_grad_sq *= self._beta2
         avg_grad_sq += (1. - self._beta2) * grad**2
-        descent_dir = momentum / np.sqrt(self._jitter + avg_grad_sq)
+        descent_dir = momentum / jnp.sqrt(self._jitter + avg_grad_sq)
         self._momentum = momentum
         self._avg_grad_sq = avg_grad_sq
         return descent_dir
@@ -393,9 +393,9 @@ class AveragedAdam(StochasticGradientOptimizer):
         avg_grad_sq *= beta2
         avg_grad_sq += (1. - beta2) * grad**2
         if self._component_wise:
-            descent_dir = momentum / np.sqrt(self._jitter+avg_grad_sq)
+            descent_dir = momentum / jnp.sqrt(self._jitter+avg_grad_sq)
         else:
-            descent_dir = momentum / np.sqrt(self._jitter+np.sum(avg_grad_sq))
+            descent_dir = momentum / jnp.sqrt(self._jitter+jnp.sum(avg_grad_sq))
         self._momentum = momentum
         self._avg_grad_sq = avg_grad_sq
         self._t = t
@@ -435,7 +435,7 @@ class Adagrad(StochasticGradientOptimizer):
 
     def descent_direction(self, grad):
         self._sum_grad_sq += grad**2
-        descent_dir = grad / np.sqrt(self._jitter + self._sum_grad_sq)
+        descent_dir = grad / jnp.sqrt(self._jitter + self._sum_grad_sq)
         return descent_dir
 
 class WindowedAdagrad(StochasticGradientOptimizer):
@@ -477,8 +477,8 @@ class WindowedAdagrad(StochasticGradientOptimizer):
         self._history.append(grad**2)
         if len(self._history) > self._window_size:
             self._history.pop(0)
-        mean_grad_squared = np.mean(np.array(self._history), axis=0)
-        descent_dir = grad / np.sqrt(self._jitter + mean_grad_squared)
+        mean_grad_squared = jnp.mean(jnp.array(self._history), axis=0)
+        descent_dir = grad / jnp.sqrt(self._jitter + mean_grad_squared)
         return descent_dir
 
         
@@ -556,10 +556,10 @@ class FASO(Optimizer):
                     if k_conv is None and k % self._k_check == 0:
                         W_upper = int(0.95 * k)
                         if W_upper > self._W_min:
-                            windows = np.linspace(self._W_min, W_upper, num=5, dtype=int)
-                            vph = np.array(history['variational_param_history'])
+                            windows = jnp.linspace(self._W_min, W_upper, num=5, dtype=int)
+                            vph = jnp.array(history['variational_param_history'])
                             R_hat_success, best_W = R_hat_convergence_check(vph, windows)
-                            iterate_average = np.mean(vph[-best_W:], axis=0)
+                            iterate_average = jnp.mean(vph[-best_W:], axis=0)
                             if diagnostics:
                                 history['iterate_average_k_history'].append(k)
                                 history['iterate_average_history'].append(iterate_average)
@@ -571,8 +571,8 @@ class FASO(Optimizer):
                     # Once convergence has been reached compute the MCSE
                     if k_conv is not None and k - k_conv == W_check:
                         W = W_check
-                        converged_iterates = np.array(history['variational_param_history'][-W:])
-                        iterate_average = np.mean(converged_iterates, axis=0)
+                        converged_iterates = jnp.array(history['variational_param_history'][-W:])
+                        iterate_average = jnp.mean(converged_iterates, axis=0)
                         if diagnostics and k not in history['iterate_average_k_history']:
                             history['iterate_average_k_history'].append(k)
                             history['iterate_average_history'].append(iterate_average)
@@ -585,33 +585,33 @@ class FASO(Optimizer):
                                                 - converged_iterates[W - 1, :])
                                 iterate_diff_zero = iterate_diff == 0
                                 # ignore constant variational parameters
-                                if np.any(iterate_diff_zero):
-                                    indices = np.argwhere(iterate_diff_zero)
-                                    converged_iterates = np.delete(converged_iterates, indices, 1)
+                                if jnp.any(iterate_diff_zero):
+                                    indices = jnp.argwhere(iterate_diff_zero)
+                                    converged_iterates = jnp.delete(converged_iterates, indices, 1)
                                 converged_log_sdevs = converged_iterates[:, -dim:]
-                                mean_log_stdev = np.mean(converged_log_sdevs, axis=0)
+                                mean_log_stdev = jnp.mean(converged_log_sdevs, axis=0)
                                 ess, mcse = MCSE(converged_iterates)
-                                mcse_mean = mcse[:dim] / np.exp(mean_log_stdev)
+                                mcse_mean = mcse[:dim] / jnp.exp(mean_log_stdev)
                                 mcse_stdev = mcse[-dim:]
-                                mcse = np.concatenate((mcse_mean, mcse_stdev))
+                                mcse = jnp.concatenate((mcse_mean, mcse_stdev))
                             else:
                                 ess, mcse = MCSE(converged_iterates)
                         if diagnostics:
                             history['ess_and_mcse_k_history'].append(k)
                             history['ess_history'].append(ess)
                             history['mcse_history'].append(mcse)
-                        if (np.max(mcse) < self._mcse_threshold and np.min(ess) > self._ESS_min):
+                        if (jnp.max(mcse) < self._mcse_threshold and jnp.min(ess) > self._ESS_min):
                             k_stopped = k
                             break
                         else:
                             relative_mcse_time = mcse_timer.interval / W
                             relative_opt_time = total_opt_time / k
                             relative_time_ratio = relative_opt_time / relative_mcse_time
-                            recheck_scale = max(1.05, 1 + 1 / np.sqrt(1 + relative_time_ratio))
+                            recheck_scale = max(1.05, 1 + 1 / jnp.sqrt(1 + relative_time_ratio))
                             W_check = int(recheck_scale * W_check + 1)
                     if k % self._k_check == 0:
-                        value_history = np.array(history['value_history'])
-                        avg_loss = np.mean(value_history[max(0, k - 1000):k + 1])
+                        value_history = jnp.array(history['value_history'])
+                        avg_loss = jnp.mean(value_history[max(0, k - 1000):k + 1])
                         R_conv = 'converged' if k_conv is not None else 'not converged'
                         progress.set_description(
                             'average loss = {:,.5g} | R hat {}|'.format(avg_loss, R_conv))
@@ -627,12 +627,12 @@ class FASO(Optimizer):
                       'iterations')
             else:
                 print('WARNING: stationarity reached but MCSE too large and/or ESS too small')
-                print('WARNING: maximum MCSE = {:.3g}'.format(np.max(mcse)))
-                print('WARNING: minimum ESS = {:.1f}'.format(np.min(ess)))
+                print('WARNING: maximum MCSE = {:.3g}'.format(jnp.max(mcse)))
+                print('WARNING: minimum ESS = {:.1f}'.format(jnp.min(ess)))
                 # print(ess)
         else:
             print('Convergence reached at iteration', k_stopped)
-        results = {d: np.array(h) for d, h in history.items()}
+        results = {d: jnp.array(h) for d, h in history.items()}
         results['k_conv'] = k_conv
         results['k_Rhat'] = k_Rhat
         results['k_stopped'] = k_stopped
@@ -722,8 +722,8 @@ class RAABBVI(FASO):
         with open(model_file) as f:
             model_code = f.read()
         N = len(y)
-        w = npy.array(1/(1 + npy.arange(N)[::-1]**2/s)**a) #weights
-        data = dict(N=npy.array(N), y=y, x=x, rho=npy.array(self._rho), w=w) #data
+        w = np.array(1/(1 + np.arange(N)[::-1]**2/s)**a) #weights
+        data = dict(N=np.array(N), y=y, x=x, rho=np.array(self._rho), w=w) #data
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
               init = [initfun(100, 5, chain_id=i) for i in range(n_chains) ] #initial values
         else:
@@ -733,9 +733,9 @@ class RAABBVI(FASO):
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
         else:
-            kappa = np.mean(fit['kappa'])
-        log_c = np.mean(fit['log_c'])
-        c = np.exp(log_c)
+            kappa = jnp.mean(fit['kappa'])
+        log_c = jnp.mean(fit['log_c'])
+        c = jnp.exp(log_c)
         return fit, kappa, c
         
     
@@ -762,10 +762,10 @@ class RAABBVI(FASO):
             Slope
         """
         n = y.size
-        x = np.column_stack((np.ones(n),x))
-        w = np.diag(1/(1 + np.arange(n)[::-1]**2/s**2)**a) #weights
-        y = np.reshape(y,(n,1))
-        beta = np.linalg.inv(x.T @ w @ x) @ (x.T @ w @ y)
+        x = jnp.column_stack((jnp.ones(n),x))
+        w = jnp.diag(1/(1 + jnp.arange(n)[::-1]**2/s**2)**a) #weights
+        y = jnp.reshape(y,(n,1))
+        beta = jnp.linalg.inv(x.T @ w @ x) @ (x.T @ w @ y)
         return beta[0], beta[1]
         
     def convg_iteration_trend_detection(self, slope):
@@ -886,13 +886,13 @@ class RAABBVI(FASO):
                         # Conduct weighted linear regression to estimate parameters
                         # of SKL hat
                         if len(history['SKL_history']) > 0:
-                            skl_history = npy.array(history['SKL_history'])
-                            y_wlr = npy.log(skl_history)
-                            learning_hist = npy.array(history['learning_rate_hist'])
-                            x_wlr = npy.log(learning_hist)
+                            skl_history = np.array(history['SKL_history'])
+                            y_wlr = np.log(skl_history)
+                            learning_hist = np.array(history['learning_rate_hist'])
+                            x_wlr = np.log(learning_hist)
                             fit, kappa, c = self.weighted_linear_regression(reg_model, y_wlr, x_wlr)
                             if diagnostics:
-                                history['c_sample_hist'].append(np.exp(fit['log_c']))
+                                history['c_sample_hist'].append(jnp.exp(fit['log_c']))
                                 if isinstance(self._sgo, AveragedRMSProp) or \
                                     isinstance(self._sgo, AveragedAdam):
                                     history['kappa_sample_hist'] = None
@@ -903,22 +903,22 @@ class RAABBVI(FASO):
                             #computing the termination rule criteria 
                             if len(history['learning_rate_hist']) > 1:
                                 relative_skl = (self._rho)**kappa + \
-                                (self._accuracy_threshold/(np.sqrt(c) *
+                                (self._accuracy_threshold/(jnp.sqrt(c) *
                                        history['learning_rate_hist'][-1]**kappa))
                                 curr_iters = history['conv_iters_hist'][-1]
-                                learning_hist = np.array(history['learning_rate_hist'])
-                                conv_iter = np.array(history['conv_iters_hist'])
-                                _, slope = self.wls(np.log(learning_hist),
-                                                    np.log(conv_iter))
+                                learning_hist = jnp.array(history['learning_rate_hist'])
+                                conv_iter = jnp.array(history['conv_iters_hist'])
+                                _, slope = self.wls(jnp.log(learning_hist),
+                                                    jnp.log(conv_iter))
                                 trend_check = self.convg_iteration_trend_detection(slope)
                                 if trend_check: #if negative relationship use all observations
-                                    y_wls = np.array(history['conv_iters_hist'])
-                                    x_wls = np.array(history['learning_rate_hist'])
+                                    y_wls = jnp.array(history['conv_iters_hist'])
+                                    x_wls = jnp.array(history['learning_rate_hist'])
                                 else: #remove the initial observation
-                                    y_wls = np.array(history['conv_iters_hist'][1:])
-                                    x_wls = np.array(history['learning_rate_hist'][1:])
-                                b0, b1 = self.wls(np.log(x_wls), np.log(y_wls))
-                                pred_iters = int(np.exp(b0) * \
+                                    y_wls = jnp.array(history['conv_iters_hist'][1:])
+                                    x_wls = jnp.array(history['learning_rate_hist'][1:])
+                                b0, b1 = self.wls(jnp.log(x_wls), jnp.log(y_wls))
+                                pred_iters = int(jnp.exp(b0) * \
                                         (self._rho * history['learning_rate_hist'][-1])**b1)
                                 history['predicted_iters_hist'].append(pred_iters)
                                 relative_iters = pred_iters/(curr_iters + self._iters0)
@@ -941,7 +941,7 @@ class RAABBVI(FASO):
         else:
             print('WARNING: maximum number of iterations reached before '
                   'stopping rule was triggered')
-        results = {d: np.array(h) for d, h in history.items() if d!='k_Rhat' and d!='k_mcse' and d!='k_conv' }
+        results = {d: jnp.array(h) for d, h in history.items() if d!='k_Rhat' and d!='k_mcse' and d!='k_conv' }
         results['opt_param'] = iterate_average_curr
         results['k_stopped_final'] = k_stopped_final
         results['k_Rhat'] = history['k_Rhat']; results['k_mcse'] = history['k_mcse']
