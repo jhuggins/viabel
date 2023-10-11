@@ -655,7 +655,7 @@ class PatternDict(Pattern):
 
     def fold(self, flat_val, free=None, validate_value=None):
         free = self._free_with_default(free)
-        flat_val = np.asarray(flat_val)
+        flat_val = jnp.asarray(flat_val)
         flat_val = flat_val.ravel()
         if len(flat_val.shape) != 1:
             raise ValueError('The argument to fold must be a 1d vector.')
