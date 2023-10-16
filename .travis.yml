@@ -12,7 +12,7 @@ notifications:
 
 install:
   - pip install -U importlib_metadata  # see https://travis-ci.community/t/build-error-for-python-3-7-on-two-different-projects/12895
-  - travis_wait 20 pip install .[dev]
+  - travis_wait 30 pip install .[dev]
 
 
 script:
