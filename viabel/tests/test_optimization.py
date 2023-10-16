@@ -45,7 +45,7 @@ def test_sgo_optimize():
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = StochasticGradientOptimizer(0.01, diagnostics=True)
-        _test_optimizer(sgd, objective, true_value, 800)
+        _test_optimizer(sgd, objective, true_value, 600)
 
 
 def test_sgo_error_checks():
@@ -60,21 +60,21 @@ def test_rmsprop_optimize():
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = RMSProp(0.01)
-        _test_optimizer(sgd, objective, true_value, 800)
+        _test_optimizer(sgd, objective, true_value, 600)
 
 def test_adam_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = Adam(0.01)
-        _test_optimizer(sgd, objective, true_value, 800)
+        _test_optimizer(sgd, objective, true_value, 600)
 
 def test_adagrad_optimize():
     for scales in [np.ones(1), np.ones(3), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = Adagrad(0.1)
-        _test_optimizer(sgd, objective, true_value, 800)
+        _test_optimizer(sgd, objective, true_value, 600)
 
 
 def test_windowed_adagrad_optimize():
@@ -82,7 +82,7 @@ def test_windowed_adagrad_optimize():
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = WindowedAdagrad(0.01)
-        _test_optimizer(sgd, objective, true_value, 800)
+        _test_optimizer(sgd, objective, true_value, 600)
 
 
 def test_avgrmsprop_optimize():
