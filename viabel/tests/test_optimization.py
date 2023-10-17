@@ -35,11 +35,14 @@ class DummyObjective:
 
 
 def _test_optimizer(opt_class, objective, true_value, n_iters, **kwargs):
-    np.random.seed(851)
+    rng_key = random.PRNGKey(851)
     dim = true_value.size
-    init_param = true_value + np.random.randn(dim) / np.sqrt(dim)
+    rng_key, subkey = random.split(rng_key)
+    init_param = true_value + random.normal(subkey, (dim,)) / jnp.sqrt(dim)
+    
     results = opt_class.optimize(n_iters, objective, init_param)
-    jnp.allclose(results['opt_param'], true_value)
+    
+    return jnp.allclose(results['opt_param'], true_value)
 
 
 def test_sgo_optimize():
