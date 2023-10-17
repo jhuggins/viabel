@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import grad
+from jax import grad, jit, random
 
 from viabel.optimization import (
     RAABBVI, FASO, Adagrad, RMSProp, Adam,
@@ -23,12 +23,14 @@ class DummyObjective:
     def __init__(self, target, noise=1, scales=1):
         self._noise = noise
         self.objective_fun = lambda x: .5 * jnp.sum(((x - target) / scales)**2)
-        self.grad_objective_fun = grad(self.objective_fun)
+        self.grad_objective_fun = jit(grad(self.objective_fun))  # JIT compile gradient function
+        self.rng_key = random.PRNGKey(0)
         self.approx = DummyApproximationFamily()
         self.update = lambda x,y: x - y
 
     def __call__(self, x):
-        noisy_grad = self.grad_objective_fun(x) + self._noise * np.random.randn(x.size)
+        self.rng_key, subkey = random.split(self.rng_key)
+        noisy_grad = self.grad_objective_fun(x) + self._noise * random.normal(subkey, (x.size,))
         return self.objective_fun(x), noisy_grad
 
 
