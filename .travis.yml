@@ -16,7 +16,7 @@ install:
 
 
 script:
-  - travis_wait 20 coverage run --include='viabel/[A-Za-z]*.py' -m pytest
+  - travis_wait 40 coverage run --include='viabel/[A-Za-z]*.py' -m pytest
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
 
