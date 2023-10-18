@@ -80,7 +80,7 @@ def test_DISInclusiveKL():
     dim = 2
     _test_objective(DISInclusiveKL, 100,
                     temper_prior=MFGaussian(dim),
-                    temper_prior_params=jnp.concatenate([[0] * dim, [1] * dim]),
+                    temper_prior_params=jnp.concatenate([jnp.array([0] * dim), jnp.array([1] * dim)], axis=0),
                     ess_target=50)
 
 
