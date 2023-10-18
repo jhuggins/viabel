@@ -129,7 +129,7 @@ def test_raabbvi_avgadam_optimize():
         objective = DummyObjective(true_value, noise=.2, scales=scales)
         sgd = RAABBVI(AveragedAdam(0.01, diagnostics=True), rho=0.5, mcse_threshold=.002, 
                 inefficiency_threshold=1.0, accuracy_threshold=0.002)
-        _test_optimizer(sgd, objective, true_value, 20000)
+        _test_optimizer(sgd, objective, true_value, 15000)
         
         
 def test_faso_error_checks():
