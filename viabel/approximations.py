@@ -202,8 +202,8 @@ class MFGaussian(ApproximationFamily):
         super().__init__(dim, self._pattern.flat_length(True), True, True)
 
     def init_param(self):
-        init_param_dict = dict(mu=jnp.zeros(self.dim),
-                               log_sigma=2 * jnp.ones(self.dim))
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=2 * np.ones(self.dim))
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
@@ -211,7 +211,7 @@ class MFGaussian(ApproximationFamily):
         if seed is not None:
             subkey = random.PRNGKey(seed)
         param_dict = self._pattern.fold(var_param)
-        return param_dict['mu'] + jnp.exp(param_dict['log_sigma']) * \
+        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * \
             random.normal(subkey, (n_samples, self.dim))
 
     def _entropy(self, var_param):
@@ -262,8 +262,8 @@ class MFStudentT(ApproximationFamily):
         super().__init__(dim, self._pattern.flat_length(True), True, False)
 
     def init_param(self):
-        init_param_dict = dict(mu=jnp.zeros(self.dim),
-                               log_sigma=2 * jnp.ones(self.dim))
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=2 * np.ones(self.dim))
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
@@ -271,7 +271,7 @@ class MFStudentT(ApproximationFamily):
         if seed is not None:
             subkey = random.PRNGKey(seed)
         param_dict = self._pattern.fold(var_param)
-        return param_dict['mu'] + jnp.exp(param_dict['log_sigma']) * \
+        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * \
             random.standard_t(subkey, self.df, shape=(n_samples, self.dim))
 
     def entropy(self, var_param):
@@ -340,8 +340,8 @@ class MultivariateT(ApproximationFamily):
         super().__init__(dim, self._pattern.flat_length(True), True, False)
 
     def init_param(self):
-        init_param_dict = dict(mu=jnp.zeros(self.dim),
-                               Sigma=10 * jnp.eye(self.dim))
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               Sigma=10 * np.eye(self.dim))
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
@@ -349,11 +349,11 @@ class MultivariateT(ApproximationFamily):
         if seed is not None:
             subkey = random.PRNGKey(seed)
         df = self.df
-        s = jnp.sqrt(random.chisquare(subkey, df, shape=(n_samples,)) / df)
+        s = np.sqrt(random.chisquare(subkey, df, shape=(n_samples,)) / df)
         param_dict = self._pattern.fold(var_param)
         z = random.normal(subkey, shape=(n_samples, self.dim))
         sqrtSigma = sqrtm(param_dict['Sigma'])
-        return param_dict['mu'] + jnp.dot(z, sqrtSigma) / s[:, jnp.newaxis]
+        return param_dict['mu'] + np.dot(z, sqrtSigma) / s[:, np.newaxis]
 
     def entropy(self, var_param):
         # ignore terms that depend only on df
@@ -439,8 +439,8 @@ class NeuralNet(ApproximationFamily):
 
     def sample(self, var_param, n_samples):
         self._key, subkey = random.split(self._key)
-        z_0 = random.multivariate_normal(subkey, mean=jnp.zeros(self.input_dim),
-                                     cov=jnp.eye(self.input_dim),
+        z_0 = random.multivariate_normal(subkey, mean=np.zeros(self.input_dim),
+                                     cov=np.eye(self.input_dim),
                                      shape=(n_samples,))
         z_k, _ = self.forward(var_param, z_0)
         return z_k
@@ -633,14 +633,13 @@ class LRGaussian(ApproximationFamily):
         self._key = random.PRNGKey(seed)
         self._pattern = _get_low_rank_mu_sigma_pattern(dim, k)
         self._k = k
-        self.dim = dim  # I assume this is passed as an argument
         super().__init__(dim, self._pattern.flat_length(True), True, True)
 
     def init_param(self):
         self._key, subkey1, subkey2 = random.split(self._key, num=3)
         init_param_dict = dict(
-            mu=jnp.zeros(self.dim),
-            log_sigma=jnp.ones(self.dim),
+            mu=np.zeros(self.dim),
+            log_sigma=np.ones(self.dim),
             low_rank=random.normal(subkey1, (self.dim, self._k))
         )
         return self._pattern.flatten(init_param_dict)
@@ -654,10 +653,10 @@ class LRGaussian(ApproximationFamily):
         param_dict = self._pattern.fold(var_param)
         z = random.normal(subkey1, (n_samples, self._k))
         epsilon = random.normal(subkey2, (n_samples, self.dim))
-        D_exp = jnp.exp(param_dict['log_sigma'])
+        D_exp = np.exp(param_dict['log_sigma'])
         B = param_dict['low_rank']
 
-        return param_dict['mu'] + jnp.dot(z, B.T) + D_exp * epsilon
+        return param_dict['mu'] + np.dot(z, B.T) + D_exp * epsilon
 
     def _entropy(self, var_param):
         param_dict = self._pattern.fold(var_param)
