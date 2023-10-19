@@ -487,8 +487,8 @@ class AlphaDivergence(StochasticVariationalObjective):
     def _update_objective_and_grad(self):
         """Provides a stochastic estimate of the variational lower bound."""
 
-        def compute_log_weights(var_param, seed):
-            samples = self.approx.sample(var_param, self.num_mc_samples, seed)
+        def compute_log_weights(var_param):
+            samples = self.approx.sample(var_param, self.num_mc_samples)
             log_weights = self.model(samples) - self.approx.log_density(var_param, samples)
             return log_weights
 
@@ -498,12 +498,9 @@ class AlphaDivergence(StochasticVariationalObjective):
         # manually compute objective and gradient
 
         def objective_grad_and_log_norm(var_param):
-            rng_key = random.PRNGKey(2023)  
-            subkey, subkey_vjp = random.split(rng_key)
+            log_weights = compute_log_weights(var_param)
 
-            log_weights = compute_log_weights(var_param, rng_key)
-
-            unary_compute_log_weights = partial(compute_log_weights, seed=subkey_vjp)
+            unary_compute_log_weights = partial(compute_log_weights)
             _, log_weights_vjp_fun = vjp(unary_compute_log_weights, var_param)
             log_norm = np.max(log_weights)
             scaled_values = np.exp(log_weights - log_norm) ** alpha
