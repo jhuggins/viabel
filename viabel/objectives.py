@@ -498,10 +498,10 @@ class AlphaDivergence(StochasticVariationalObjective):
         # manually compute objective and gradient
 
         def objective_grad_and_log_norm(var_param):
-            rng_key = random.PRNGKey(0)  # Replace with your desired seed.
+            rng_key = random.PRNGKey(2023)  
             subkey, subkey_vjp = random.split(rng_key)
 
-            log_weights = compute_log_weights(var_param, subkey)
+            log_weights = compute_log_weights(var_param, rng_key)
 
             unary_compute_log_weights = partial(compute_log_weights, seed=subkey_vjp)
             _, log_weights_vjp_fun = vjp(unary_compute_log_weights, var_param)
