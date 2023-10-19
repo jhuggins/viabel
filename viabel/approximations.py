@@ -271,8 +271,10 @@ class MFStudentT(ApproximationFamily):
         if seed is not None:
             subkey = random.PRNGKey(seed)
         param_dict = self._pattern.fold(var_param)
-        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * \
-            random.standard_t(subkey, self.df, shape=(n_samples, self.dim))
+        normal_sample = random.normal(subkey, shape=(n_samples, self.dim))
+        chi_square_sample = random.chisquare(subkey, self.df, shape=(n_samples, self.dim))
+        t_sample = normal_sample / np.sqrt(chi_square_sample / self.df)
+        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * t_sample
 
     def entropy(self, var_param):
         # ignore terms that depend only on df
