@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 
 import jax.numpy as np
+import numpy.random as npr
 import jax.scipy.stats.norm as norm
 import jax.scipy.stats.t as t_dist
-from jax import jvp, random
+from jax import jvp
 from viabel.function_patterns import FlattenFunctionInput
 from viabel.patterns import NumericArrayPattern, NumericVectorPattern, PatternDict, PSDSymmetricMatrixPattern
 
@@ -197,7 +198,7 @@ class MFGaussian(ApproximationFamily):
         dim : `int`
             dimension of the underlying parameter space
         """
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self._pattern = _get_mu_log_sigma_pattern(dim)
         super().__init__(dim, self._pattern.flat_length(True), True, True)
 
@@ -207,12 +208,10 @@ class MFGaussian(ApproximationFamily):
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
-        self._key, subkey = random.split(self._key)
-        if seed is not None:
-            subkey = random.PRNGKey(seed)
+        my_rs = self._rs if seed is None else npr.RandomState(seed)
         param_dict = self._pattern.fold(var_param)
         return param_dict['mu'] + np.exp(param_dict['log_sigma']) * \
-            random.normal(subkey, (n_samples, self.dim))
+            my_rs.randn(n_samples, self.dim)
 
     def _entropy(self, var_param):
         param_dict = self._pattern.fold(var_param)
@@ -257,7 +256,7 @@ class MFStudentT(ApproximationFamily):
         if df <= 2:
             raise ValueError('df must be greater than 2')
         self._df = df
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self._pattern = _get_mu_log_sigma_pattern(dim)
         super().__init__(dim, self._pattern.flat_length(True), True, False)
 
@@ -267,14 +266,10 @@ class MFStudentT(ApproximationFamily):
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
-        self._key, subkey = random.split(self._key)
-        if seed is not None:
-            subkey = random.PRNGKey(seed)
+        my_rs = self._rs if seed is None else npr.RandomState(seed)
         param_dict = self._pattern.fold(var_param)
-        normal_sample = random.normal(subkey, shape=(n_samples, self.dim))
-        chi_square_sample = random.chisquare(subkey, self.df, shape=(n_samples, self.dim))
-        t_sample = normal_sample / np.sqrt(chi_square_sample / self.df)
-        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * t_sample
+        return param_dict['mu'] + np.exp(param_dict['log_sigma']) * \
+            my_rs.standard_t(self.df, size=(n_samples, self.dim))
 
     def entropy(self, var_param):
         # ignore terms that depend only on df
@@ -333,7 +328,7 @@ class MultivariateT(ApproximationFamily):
         if df <= 2:
             raise ValueError('df must be greater than 2')
         self._df = df
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self._pattern = _get_mu_sigma_pattern(dim)
         self._log_density = FlattenFunctionInput(
             lambda param_dict, x: multivariate_t_logpdf(
@@ -347,13 +342,11 @@ class MultivariateT(ApproximationFamily):
         return self._pattern.flatten(init_param_dict)
 
     def sample(self, var_param, n_samples, seed=None):
-        self._key, subkey = random.split(self._key)
-        if seed is not None:
-            subkey = random.PRNGKey(seed)
+        my_rs = self._rs if seed is None else npr.RandomState(seed)
         df = self.df
-        s = np.sqrt(random.chisquare(subkey, df, shape=(n_samples,)) / df)
+        s = np.sqrt(my_rs.chisquare(df, n_samples) / df)
         param_dict = self._pattern.fold(var_param)
-        z = random.normal(subkey, shape=(n_samples, self.dim))
+        z = my_rs.randn(n_samples, self.dim)
         sqrtSigma = sqrtm(param_dict['Sigma'])
         return param_dict['mu'] + np.dot(z, sqrtSigma) / s[:, np.newaxis]
 
@@ -413,7 +406,7 @@ class NeuralNet(ApproximationFamily):
         self._layers = len(layers_shapes)
         self._nonlinearity = nonlinearity
         self._last = last
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self.input_dim = layers_shapes[0][0]
         for layer_id in range(len(layers_shapes)):
             self._pattern[str(layer_id)] = NumericArrayPattern(shape=layers_shapes[layer_id])
@@ -440,10 +433,9 @@ class NeuralNet(ApproximationFamily):
         return x, log_det_J
 
     def sample(self, var_param, n_samples):
-        self._key, subkey = random.split(self._key)
-        z_0 = random.multivariate_normal(subkey, mean=np.zeros(self.input_dim),
-                                     cov=np.eye(self.input_dim),
-                                     shape=(n_samples,))
+        z_0 = npr.multivariate_normal(mean=[0] * self.input_dim,
+                                      cov=np.identity(self.input_dim),
+                                      size=n_samples)
         z_k, _ = self.forward(var_param, z_0)
         return z_k
 
@@ -490,7 +482,7 @@ class NVPFlow(ApproximationFamily):
         self.prior_param = prior_param
         self.mc_samples = mc_samples
         self._dim = dim
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self.mask = mask
         self._pattern = PatternDict(free_default=True)
         self.t = [NeuralNet(layers_t, nonlinearity=activation, last=lambda x: x)
@@ -632,33 +624,28 @@ class LRGaussian(ApproximationFamily):
         k : 'int'
             number of low rank
         """
-        self._key = random.PRNGKey(seed)
+        self._rs = npr.RandomState(seed)
         self._pattern = _get_low_rank_mu_sigma_pattern(dim, k)
         self._k = k
         super().__init__(dim, self._pattern.flat_length(True), True, True)
 
     def init_param(self):
-        self._key, subkey1, subkey2 = random.split(self._key, num=3)
-        init_param_dict = dict(
-            mu=np.zeros(self.dim),
-            log_sigma=np.ones(self.dim),
-            low_rank=random.normal(subkey1, (self.dim, self._k))
-        )
+        init_param_dict = dict(mu=np.zeros(self.dim),
+                               log_sigma=np.ones(self.dim),
+                               low_rank=self._rs.randn(self.dim,self._k))
         return self._pattern.flatten(init_param_dict)
 
+
+
     def sample(self, var_param, n_samples, seed=None):
-        if seed is None:
-            self._key, subkey1, subkey2 = random.split(self._key, num=3)
-        else:
-            subkey1, subkey2 = random.split(random.PRNGKey(seed), num=2)
-        
+        my_rs = self._rs if seed is None else npr.RandomState(seed)
         param_dict = self._pattern.fold(var_param)
-        z = random.normal(subkey1, (n_samples, self._k))
-        epsilon = random.normal(subkey2, (n_samples, self.dim))
+        z = my_rs.randn(n_samples,self._k)
+        epsilon = my_rs.randn(n_samples, self.dim)
         D_exp = np.exp(param_dict['log_sigma'])
         B = param_dict['low_rank']
 
-        return param_dict['mu'] + np.dot(z, B.T) + D_exp * epsilon
+        return param_dict['mu'] + np.dot(z,B.T) + D_exp * epsilon
 
     def _entropy(self, var_param):
         param_dict = self._pattern.fold(var_param)
