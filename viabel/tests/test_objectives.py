@@ -19,7 +19,7 @@ def _test_objective(objective_cls, num_mc_samples, **kwargs):
     objective = objective_cls(approx, log_p, num_mc_samples, **kwargs)
     init_param = jnp.array([0, 0, 1, 1], dtype=jnp.float32)
     opt = RMSProp(0.1)
-    opt_results = opt.optimize(400, objective, init_param)
+    opt_results = opt.optimize(600, objective, init_param)
     est_mean, est_cov = approx.mean_and_cov(opt_results['opt_param'])
     est_stdev = jnp.sqrt(jnp.diag(est_cov))
     print(est_stdev, stdev)
