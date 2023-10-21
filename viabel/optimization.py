@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import tqdm
 import os
 import numpy as np
-import stan
+import pystan
 import json
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer
@@ -734,8 +734,9 @@ class RAABBVI(FASO):
               init = [initfun(100, 5, chain_id=i) for i in range(n_chains) ] #initial values
         else:
             init = [initfun(100, 5, 0.8, chain_id=i) for i in range(n_chains) ] #initial values
-        model = stan.build(program_code=model_code, data=data_parsed)
-        fit = model.sample(num_chains=n_chains, num_samples=1000,init = init) #sampling from the model
+        model = pystan.StanModel(model_code=model_code, model_name=model_name)
+        fit = model.sampling(data=data, init=init, iter=1000, chains=n_chains,
+                             control=dict(adapt_delta=0.98))  # sampling from the model
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
         else:
