@@ -5,7 +5,7 @@ import tqdm
 import os
 import numpy as np
 import stan
-
+import json
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer
 from viabel.approximations import MFGaussian
@@ -725,11 +725,16 @@ class RAABBVI(FASO):
         N = len(y)
         w = np.array(1/(1 + np.arange(N)[::-1]**2/s)**a) #weights
         data = dict(N=np.array(N), y=y, x=x, rho=np.array(self._rho), w=w) #data
+        for key, value in data.items():
+            if isinstance(value, np.ndarray):
+                data[key] = value.tolist()
+        json_str = json.dumps(data)
+        data_parsed = json.loads(json_str)
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
               init = [initfun(100, 5, chain_id=i) for i in range(n_chains) ] #initial values
         else:
             init = [initfun(100, 5, 0.8, chain_id=i) for i in range(n_chains) ] #initial values
-        model = stan.build(program_code=model_code, data=data)
+        model = stan.build(program_code=model_code, data=data_parsed)
         fit = model.sample(num_chains=n_chains, num_samples=1000,init = init) #sampling from the model
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
