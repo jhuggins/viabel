@@ -118,16 +118,16 @@ def test_raabbvi_avgrmsprop_optimize():
     for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = RAABBVI(AveragedRMSProp(0.3, diagnostics=True), rho=0.5, mcse_threshold=.02, 
-                inefficiency_threshold=1.0, accuracy_threshold=0.002)
-        _test_optimizer(sgd, objective, true_value, 20000)
+        sgd = RAABBVI(AveragedRMSProp(0.1, diagnostics=True), rho=0.5, mcse_threshold=.002, 
+                inefficiency_threshold=1.0, accuracy_threshold=0.002) #To do: need to figure out the `json` issue
+        _test_optimizer(sgd, objective, true_value, 1000)
   
         
 def test_raabbvi_avgadam_optimize():
     for scales in [np.ones(2), np.ones(4), np.geomspace(.1, 1, 4)]:
         true_value = np.arange(scales.size)
         objective = DummyObjective(true_value, noise=.2, scales=scales)
-        sgd = RAABBVI(AveragedAdam(0.3, diagnostics=True), rho=0.5, mcse_threshold=.02, 
+        sgd = RAABBVI(AveragedAdam(0.1, diagnostics=True), rho=0.5, mcse_threshold=.002, 
                 inefficiency_threshold=1.0, accuracy_threshold=0.002)
         _test_optimizer(sgd, objective, true_value, 15000)
         
