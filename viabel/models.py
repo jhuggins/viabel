@@ -78,14 +78,14 @@ class Model(object):
         raise NotImplementedError()
 
 
-def _make_stan_log_density(fitobj):
+def _make_stan_log_density(bs_model):
     @jax.custom_vjp
     def log_density(x):
-        return vectorize_if_needed(fitobj.log_density, x)
+        return vectorize_if_needed(bs_model.log_density, x)
 
     def log_density_fwd(x):
-        x = np.asarray(x)
-        value, grad = vectorize_if_needed(fitobj.log_density_gradient, x)
+        x = np.asarray(x, dtype="float64")
+        value, grad = vectorize_if_needed(bs_model.log_density_gradient, x)
         return log_density(x), grad
 
     def log_density_bwd(res, g):
@@ -99,14 +99,14 @@ def _make_stan_log_density(fitobj):
 class StanModel(Model):
     """Class that encapsulates a BridgeStan model."""
 
-    def __init__(self, fit):
+    def __init__(self, bs_model):
         """
         Parameters
         ----------
         fit : `StanFit4model` object
         """
-        self._fit = fit
-        super().__init__(_make_stan_log_density(fit))
+        self._fit = bs_model
+        super().__init__(_make_stan_log_density(bs_model))
 
     def constrain(self, model_param):
         return self._fit.param_constrain(model_param)

@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
-
-import jax.numpy as np
-import numpy.random as npr
-from jax import value_and_grad, vjp, grad, random, hessian, jacobian, vmap, jit
 from functools import partial
-from jax import device_get
+
+import numpy.random as npr
+import jax.numpy as np
+from jax import (value_and_grad, vjp, grad, 
+                 hessian, jacobian, vmap, 
+                 jit, device_get)
+
 
 __all__ = [
     'VariationalObjective',
@@ -416,20 +418,6 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
     def _update_objective_and_grad(self):
         approx = self.approx
-        
-        def choice(key, a, p, size=None):
-            """Sample from a with probabilities p using JAX"""
-            cdf = np.cumsum(p)
-            if isinstance(a, int):
-                a = np.arange(a)
-                if p is None:
-                    p = np.ones(a.shape) / a.size
-            if size is None:
-                random_values = random.uniform(key)
-            else:
-                random_values = random.uniform(key, shape=(size,))
-            indices = np.searchsorted(cdf, random_values)
-            return a[indices]
 
         def variational_objective(var_param):
             if not self._use_resampling or self._objective_step % self._num_resampling_batches == 0:
@@ -448,10 +436,9 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
             if not self._use_resampling:
                 state_w = self._state_w_clipped.primal
-                return -np.inner(evice_get(state_w), self._state_log_q) / self.num_mc_samples
+                return -np.inner(device_get(state_w), self._state_log_q) / self.num_mc_samples
             else:
-                rng = random.PRNGKey(0)
-                indices = choice(key=rng, a=self.num_mc_samples,
+                indices = npr.choice(a=self.num_mc_samples,
                                            size=self._resampling_batch_size, p=self._state_w_normalized)
                 samples_resampled = self._state_samples[indices]
                 
@@ -492,7 +479,7 @@ class AlphaDivergence(StochasticVariationalObjective):
             log_weights = self.model(samples) - self.approx.log_density(var_param, samples)
             return log_weights
 
-        #log_weights_vjp = vector_jacobian_product(compute_log_weights)
+
         alpha = self.alpha
 
         # manually compute objective and gradient

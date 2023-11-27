@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import scipy
 
 import jax.numpy as np
 import numpy.random as npr
@@ -317,9 +318,8 @@ def _get_mu_sigma_pattern(dim):
     return ms_pattern
 
 def sqrtm(matrix):
-    _, v = np.linalg.eigh(matrix)
-    sqrt_matrix = np.dot(v, np.dot(np.diag(np.sqrt(np.abs(_))), np.linalg.inv(v)))
-    return sqrt_matrix
+    L = scipy.linalg.cholesky(matrix)
+    return L
     
 class MultivariateT(ApproximationFamily):
     """A full-rank multivariate t approximation family."""

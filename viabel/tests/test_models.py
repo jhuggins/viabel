@@ -1,18 +1,13 @@
-import pickle
-
-import jax.numpy as jnp
-import numpy as np
 import bridgestan as bs
 import pytest
+import numpy as np
+import jax.numpy as jnp
 from jax.scipy.stats import norm
-from jax.test_util import check_vjp
 from jax import vjp
 
 from viabel import models
 
 def _test_model(m, x, supports_tempering, supports_constrain):
-    #check_vjp(m, (x,), modes=['rev'], order=2)
-    #check_vjp(m, x[0])
     assert supports_tempering == m.supports_tempering
     if supports_tempering:  # pragma: no cover
         m.set_inverse_temperature(.5)
@@ -24,7 +19,6 @@ def _test_model(m, x, supports_tempering, supports_constrain):
     else:
         with pytest.raises(NotImplementedError):
             m.constrain(x[0])
-
 
 
 

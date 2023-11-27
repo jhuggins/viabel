@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
+import os
 
+import numpy as np
 import jax.numpy as jnp
 import tqdm
-import os
-import numpy as np
 import stan
 
 from viabel._mc_diagnostics import MCSE, R_hat_convergence_check
 from viabel._utils import Timer
 from viabel.approximations import MFGaussian
-from collections import defaultdict
+
 
 
 __all__ = [
@@ -130,7 +131,7 @@ class StochasticGradientOptimizer(Optimizer):
             results['opt_param'] = variational_param.copy()
         # if descent_dir_history is not None:
         #     results['descent_dir_history'] = descent_dir_history
-        results_dict = {d: jnp.array(h) for d, h in results.items()}
+        results_dict = {d: np.array(h) for d, h in results.items()}
         return results_dict
 
     def descent_direction(self, grad):
@@ -730,14 +731,14 @@ class RAABBVI(FASO):
         else:
             init = [initfun(100, 5, 0.8, chain_id=i) for i in range(n_chains) ] #initial values
         model = stan.build(program_code=model_code, data=data)
-        fit = model.sample(num_chains=n_chains, num_samples=1000,init = init)   # sampling from the model
+        samples = model.sample(num_chains=n_chains, num_samples=1000,init = init)   # sampling from the model
         if isinstance(self._sgo, AveragedRMSProp) or isinstance(self._sgo, AveragedAdam):
             kappa = 1
         else:
-            kappa = jnp.mean(fit['kappa'])
-        log_c = jnp.mean(fit['log_c'])
+            kappa = jnp.mean(samples['kappa'])
+        log_c = jnp.mean(samples['log_c'])
         c = jnp.exp(log_c)
-        return fit, kappa, c
+        return samples, kappa, c
         
     
     def wls(self, x, y, s=9, a=0.25):

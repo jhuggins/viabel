@@ -1,3 +1,7 @@
+# This file contains code that is derived from paragami (https://github.com/rgiordan/paragami).
+# paragami is originally licensed under the Apache-2.0 license.
+
+
 from abc import ABC, abstractmethod
 import jax
 import json

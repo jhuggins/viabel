@@ -1,3 +1,8 @@
+# This file contains code that is derived from paragami (https://github.com/rgiordan/paragami).
+# paragami is originally licensed under the Apache-2.0 license.
+
+
+
 import copy
 import numpy as np
 import warnings

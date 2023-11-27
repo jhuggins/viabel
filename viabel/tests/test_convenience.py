@@ -1,7 +1,7 @@
-import jax.numpy as jnp
-import numpy as np
 import pytest
+import numpy as np
 from jax.scipy.stats import norm
+import jax.numpy as jnp
 
 from viabel import convenience
 from viabel.models import Model
@@ -51,9 +51,10 @@ def test_vi_diagnostics():
 
     def log_p(x):
         return jnp.sum(norm.logpdf(x), axis=1)
-    results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100)
+    results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100, n_iters=3000)
     diagnostics = convenience.vi_diagnostics(results['opt_param'],
-                                             objective=results['objective'])
+                                             objective=results['objective'], 
+                                             n_samples=3000)
     assert diagnostics['khat'] < .1
     assert diagnostics['d2'] < 0.1
 
@@ -62,7 +63,8 @@ def test_vi_diagnostics():
     model2 = Model(log_p2)
     diagnostics2 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
-                                              model=model2)
+                                              model=model2,
+                                              n_samples=3000)
     assert diagnostics2['khat'] > 0.7
     assert 'd2' not in diagnostics2
 
@@ -71,7 +73,8 @@ def test_vi_diagnostics():
     model3 = Model(log_p3)
     diagnostics3 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
-                                              model=model3)
+                                              model=model3,
+                                              n_samples=3000)
     print(diagnostics3)
     assert diagnostics3['khat'] < 0  # weights are bounded
     assert diagnostics3['d2'] > 2
