@@ -4,7 +4,7 @@ from functools import partial
 import numpy.random as npr
 import jax.numpy as np
 from jax import (value_and_grad, vjp, grad, 
-                 hessian, jacobian, vmap, 
+                 random, hessian, jacobian, vmap, 
                  jit, device_get)
 
 
@@ -418,7 +418,21 @@ class DISInclusiveKL(StochasticVariationalObjective):
 
     def _update_objective_and_grad(self):
         approx = self.approx
-
+        
+        def choice(key, a, p, size=None):
+            """Sample from a with probabilities p using JAX"""
+            cdf = np.cumsum(p)
+            if isinstance(a, int):
+                a = np.arange(a)
+                if p is None:
+                    p = np.ones(a.shape) / a.size
+            if size is None:
+                random_values = random.uniform(key)
+            else:
+                random_values = random.uniform(key, shape=(size,))
+            indices = np.searchsorted(cdf, random_values)
+            return a[indices]
+            
         def variational_objective(var_param):
             if not self._use_resampling or self._objective_step % self._num_resampling_batches == 0:
                 state_samples = approx.sample(var_param, self.num_mc_samples).primal
@@ -438,8 +452,9 @@ class DISInclusiveKL(StochasticVariationalObjective):
                 state_w = self._state_w_clipped.primal
                 return -np.inner(device_get(state_w), self._state_log_q) / self.num_mc_samples
             else:
-                indices = npr.choice(a=self.num_mc_samples,
-                                           size=self._resampling_batch_size, p=self._state_w_normalized)
+                rng = random.PRNGKey(0)
+                indices = choice(rng, a=self.num_mc_samples,
+                                     size=self._resampling_batch_size, p=self._state_w_normalized)
                 samples_resampled = self._state_samples[indices]
                 
                 obj = np.mean(-approx.log_density(var_param, samples_resampled))

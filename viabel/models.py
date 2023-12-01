@@ -85,8 +85,9 @@ def _make_stan_log_density(bs_model):
 
     def log_density_fwd(x):
         x = np.asarray(x, dtype="float64")
-        value, grad = vectorize_if_needed(bs_model.log_density_gradient, x)
-        return log_density(x), grad
+        vectorized_fun = jax.vmap(bs_model.log_density_gradient)
+        result = vectorized_fun(x)
+        return log_density(x), np.array([a[1] for a in result])
 
     def log_density_bwd(res, g):
         grad = res
