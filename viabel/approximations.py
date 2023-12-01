@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
+import scipy
 
-import autograd.numpy as np
-import autograd.numpy.random as npr
-import autograd.scipy.stats.norm as norm
-import autograd.scipy.stats.t as t_dist
-from autograd import elementwise_grad
-from autograd.scipy.linalg import sqrtm
-from paragami import (
-    FlattenFunctionInput, NumericArrayPattern, NumericVectorPattern, PatternDict,
-    PSDSymmetricMatrixPattern)
+import jax.numpy as np
+import numpy.random as npr
+import jax.scipy.stats.norm as norm
+import jax.scipy.stats.t as t_dist
+from jax import jvp
+from viabel.function_patterns import FlattenFunctionInput
+from viabel.patterns import NumericArrayPattern, NumericVectorPattern, PatternDict, PSDSymmetricMatrixPattern
 
-from ._distributions import multivariate_t_logpdf
+from viabel._distributions import multivariate_t_logpdf
 
 __all__ = [
     'ApproximationFamily',
@@ -318,7 +317,10 @@ def _get_mu_sigma_pattern(dim):
     ms_pattern['Sigma'] = PSDSymmetricMatrixPattern(size=dim)
     return ms_pattern
 
-
+def sqrtm(matrix):
+    L = scipy.linalg.cholesky(matrix)
+    return L
+    
 class MultivariateT(ApproximationFamily):
     """A full-rank multivariate t approximation family."""
 
@@ -415,17 +417,19 @@ class NeuralNet(ApproximationFamily):
 
     def forward(self, var_param, x):
         log_det_J = np.zeros(x.shape[0])
-        derivative = elementwise_grad(self._nonlinearity)
-        derivative_last = elementwise_grad(self._last)
         for layer_id in range(self._layers):
             W = var_param[str(layer_id)]
             b = var_param[str(layer_id) + "_b"]
             if layer_id + 1 == self._layers:
                 x = self._last(np.dot(x, W) + b)
-                log_det_J += np.log(np.abs(np.dot(derivative_last(x), W.T).sum(axis=1)))
+                _, elementwise_gradient_last = jvp(self._last, (x,), (np.ones_like(x),))
+
+                log_det_J += np.log(np.abs(np.dot(elementwise_gradient_last, W.T).sum(axis=1)))
             else:
                 x = self._nonlinearity(np.dot(x, W) + b)
-                log_det_J += np.log(np.abs(np.dot(derivative(x), W.T).sum(axis=1)))
+                _, elementwise_gradient = jvp(self._nonlinearity, (x,), (np.ones_like(x),))
+
+                log_det_J += np.log(np.abs(np.dot(elementwise_gradient, W.T).sum(axis=1)))
         return x, log_det_J
 
     def sample(self, var_param, n_samples):

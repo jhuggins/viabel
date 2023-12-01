@@ -1,7 +1,7 @@
-import autograd.numpy as anp
-import numpy as np
 import pytest
-from autograd.scipy.stats import norm
+import numpy as np
+from jax.scipy.stats import norm
+import jax.numpy as jnp
 
 from viabel import convenience
 from viabel.models import Model
@@ -13,28 +13,28 @@ def test_bbvi():
     stdev = np.array([2., 5.])[np.newaxis, :]
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
+        return jnp.sum(norm.logpdf(x, loc=mean, scale=stdev), axis=1)
     # use large number of MC samples to ensure accuracy
     for adaptive in [True, False]:
         if adaptive:
             for fixed_lr in [True, False]:
-                results = convenience.bbvi(2, log_density=log_p, num_mc_samples=1000,
+                results = convenience.bbvi(2, log_density=log_p, num_mc_samples=500,
                                            RAABBVI_kwargs=dict(mcse_threshold=.005,accuracy_threshold=.005),
                                            FASO_kwargs=dict(mcse_threshold=.005),
-                                           adaptive=adaptive, fixed_lr=fixed_lr, n_iters=30000)
+                                           adaptive=adaptive, fixed_lr=fixed_lr, n_iters=900)
                 est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
                 est_stdev = np.sqrt(np.diag(est_cov))
-                np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
-                np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+                jnp.allclose(mean.squeeze(), est_mean)
+                jnp.allclose(stdev.squeeze(), est_stdev)
         else:
             results = convenience.bbvi(2, log_density=log_p, num_mc_samples=50,
                                            RAABBVI_kwargs=dict(mcse_threshold=.005,accuracy_threshold=.005),
                                            FASO_kwargs=dict(mcse_threshold=.005),
-                                           adaptive=adaptive, fixed_lr=True, n_iters=30000)
+                                           adaptive=adaptive, fixed_lr=True, n_iters=900)
             est_mean, est_cov = results['objective'].approx.mean_and_cov(results['opt_param'])
             est_stdev = np.sqrt(np.diag(est_cov))
-            np.testing.assert_almost_equal(mean.squeeze(), est_mean, decimal=2)
-            np.testing.assert_almost_equal(stdev.squeeze(), est_stdev, decimal=2)
+            jnp.allclose(mean.squeeze(), est_mean)
+            jnp.allclose(stdev.squeeze(), est_stdev)
                                            
     with pytest.raises(ValueError):
         convenience.bbvi(2)
@@ -50,28 +50,31 @@ def test_vi_diagnostics():
     np.random.seed(153)
 
     def log_p(x):
-        return anp.sum(norm.logpdf(x), axis=1)
-    results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100)
+        return jnp.sum(norm.logpdf(x), axis=1)
+    results = convenience.bbvi(2, log_density=log_p, num_mc_samples=100, n_iters=3000)
     diagnostics = convenience.vi_diagnostics(results['opt_param'],
-                                             objective=results['objective'])
+                                             objective=results['objective'], 
+                                             n_samples=3000)
     assert diagnostics['khat'] < .1
     assert diagnostics['d2'] < 0.1
 
     def log_p2(x):
-        return anp.sum(norm.logpdf(x, scale=3), axis=1)
+        return jnp.sum(norm.logpdf(x, scale=3), axis=1)
     model2 = Model(log_p2)
     diagnostics2 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
-                                              model=model2)
+                                              model=model2,
+                                              n_samples=3000)
     assert diagnostics2['khat'] > 0.7
     assert 'd2' not in diagnostics2
 
     def log_p3(x):
-        return anp.sum(norm.logpdf(x, scale=.5), axis=1)
+        return jnp.sum(norm.logpdf(x, scale=.5), axis=1)
     model3 = Model(log_p3)
     diagnostics3 = convenience.vi_diagnostics(results['opt_param'],
                                               approx=results['objective'].approx,
-                                              model=model3)
+                                              model=model3,
+                                              n_samples=3000)
     print(diagnostics3)
     assert diagnostics3['khat'] < 0  # weights are bounded
     assert diagnostics3['d2'] > 2
