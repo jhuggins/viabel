@@ -49,20 +49,23 @@ The equivalent BibTeX entry is:
 
 If you use this package for variational inference, please cite:
 
-[Robust, Automated, and Accurate Black-box Variational Inference](https://arxiv.org/abs/2203.15945).
+[A Framework for Improving the Reliability of Black-box Variational Inference](https://jmlr.org/papers/v25/22-0327.html).
 Manushi Welandawe,
 Michael Riis Andersen,
 Aki Vehtari,
-Jonathan H. Huggins.
-arXiv:2203.15945 [stat.ML] (2022).
+Jonathan H. Huggins (2024).
+Journal of Machine Learning Research, 25(219):1−71.
 
 The equivalent BibTeX entry is:
 ```
-@article{Welandawe:2022:BBVI,
-  author = {Welandawe, Manushi and Andersen, Michael Riis and Vehtari, Aki and Huggins, Jonathan H},
-  title = {Robust, Automated, and Accurate Black-box Variational Inference},
-  journal = {arXiv},
-  volume = {arXiv:2203.15945 [stat.ML]},
-  year = {2022}
+@article{Welandawe:2022:RABVI,
+  author  = {Manushi Welandawe and Michael Riis Andersen and Aki Vehtari and Jonathan H. Huggins},
+  title   = {A Framework for Improving the Reliability of Black-box Variational Inference},
+  journal = {Journal of Machine Learning Research},
+  year    = {2024},
+  volume  = {25},
+  number  = {219},
+  pages   = {1--71},
+  url     = {http://jmlr.org/papers/v25/22-0327.html}
 }
 ```
