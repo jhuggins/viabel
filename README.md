@@ -58,7 +58,7 @@ Journal of Machine Learning Research, 25(219):1−71.
 
 The equivalent BibTeX entry is:
 ```
-@article{Welandawe:2022:RABVI,
+@article{Welandawe:2024:BBVI,
   author  = {Manushi Welandawe and Michael Riis Andersen and Aki Vehtari and Jonathan H. Huggins},
   title   = {A Framework for Improving the Reliability of Black-box Variational Inference},
   journal = {Journal of Machine Learning Research},
