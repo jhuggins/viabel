@@ -4,3 +4,5 @@ recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 
 include viabel/data/*.stan
+include viabel/data/*.json
+

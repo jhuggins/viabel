@@ -1,6 +1,6 @@
 import warnings
 
-import autograd.numpy as np
+import jax.numpy as np
 from scipy.fftpack import next_fast_len
 
 
@@ -64,9 +64,9 @@ def ess(samples):
 
     rho_hat_t = np.zeros(n_draw)
     rho_hat_even = 1.0
-    rho_hat_t[0] = rho_hat_even
+    rho_hat_t =rho_hat_t.at[0].set(rho_hat_even)
     rho_hat_odd = 1.0 - (mean_var - np.mean(acov[:, 1])) / var_plus
-    rho_hat_t[1] = rho_hat_odd
+    rho_hat_t = rho_hat_t.at[1].set(rho_hat_odd)
 
     # Geyer's initial positive sequence
     t = 1
@@ -74,20 +74,20 @@ def ess(samples):
         rho_hat_even = 1.0 - (mean_var - np.mean(acov[:, t + 1])) / var_plus
         rho_hat_odd = 1.0 - (mean_var - np.mean(acov[:, t + 2])) / var_plus
         if (rho_hat_even + rho_hat_odd) >= 0:
-            rho_hat_t[t + 1] = rho_hat_even
-            rho_hat_t[t + 2] = rho_hat_odd
+            rho_hat_t = rho_hat_t.at[t+1].set(rho_hat_even)
+            rho_hat_t = rho_hat_t.at[t + 2].set(rho_hat_odd)
         t += 2
 
     max_t = t - 2
     # improve estimation
     if rho_hat_even > 0:
-        rho_hat_t[max_t + 1] = rho_hat_even
+        rho_hat_t = rho_hat_t.at[max_t + 1].set(rho_hat_even)
     # Geyer's initial monotone sequence
     t = 1
     while t <= max_t - 2:
         if (rho_hat_t[t + 1] + rho_hat_t[t + 2]) > (rho_hat_t[t - 1] + rho_hat_t[t]):
-            rho_hat_t[t + 1] = (rho_hat_t[t - 1] + rho_hat_t[t]) / 2.0
-            rho_hat_t[t + 2] = rho_hat_t[t + 1]
+            rho_hat_t = rho_hat_t.at[t + 1].set((rho_hat_t[t - 1] + rho_hat_t[t]) / 2.0)
+            rho_hat_t = rho_hat_t.at[t + 2].set(rho_hat_t[t + 1])
         t += 2
 
     ess = n_chain * n_draw
@@ -117,6 +117,7 @@ def MCSE(sample):
     n_iters, d = sample.shape
     sd_dev = np.sqrt(np.var(sample, ddof=1, axis=0))
     eff_samp = [ess(sample[:, i].reshape(1, n_iters)) for i in range(d)]
+    eff_samp = np.asarray(eff_samp)
     mcse = sd_dev / np.sqrt(eff_samp)
     return eff_samp, mcse
 
@@ -178,7 +179,8 @@ def R_hat_convergence_check(samples, windows, Rhat_threshold=1.1):
     best_W: `int`
         Best window size
     """
-    R_hat_array = [np.max(compute_R_hat(np.array(samples[-window:]), 0)) for window in windows]
+    R_hat_array = [np.max(compute_R_hat(np.array(samples[-window:]), 0)) for window in windows]  
+    R_hat_array = np.asarray(R_hat_array)
     best_R_hat_ind = np.argmin(R_hat_array)
     success = R_hat_array[best_R_hat_ind] <= Rhat_threshold
     return success, windows[best_R_hat_ind]

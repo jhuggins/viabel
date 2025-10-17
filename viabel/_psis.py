@@ -134,6 +134,7 @@ def psislw(lw, Reff=1.0, overwrite_lw=False):
         Pareto tail indices
 
     """
+    lw = np.array(lw)
     if lw.ndim == 2:
         n, m = lw.shape
     elif lw.ndim == 1:

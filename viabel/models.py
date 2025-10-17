@@ -1,4 +1,5 @@
-from autograd.extend import defvjp, primitive
+import jax
+import numpy as np
 
 from ._utils import ensure_2d, vectorize_if_needed
 
@@ -77,28 +78,37 @@ class Model(object):
         raise NotImplementedError()
 
 
-def _make_stan_log_density(fitobj):
-    @primitive
+def _make_stan_log_density(bs_model):
+    @jax.custom_vjp
     def log_density(x):
-        return vectorize_if_needed(fitobj.log_prob, x)
+        return vectorize_if_needed(bs_model.log_density, x)
 
-    def log_density_vjp(ans, x):
-        return lambda g: ensure_2d(g) * vectorize_if_needed(fitobj.grad_log_prob, x)
-    defvjp(log_density, log_density_vjp)
+    def log_density_fwd(x):
+        x = np.asarray(x, dtype="float64")
+        vectorized_fun = jax.vmap(bs_model.log_density_gradient)
+        result = vectorized_fun(x)
+        return log_density(x), np.array([a[1] for a in result])
+
+    def log_density_bwd(res, g):
+        grad = res
+        g = np.asarray(g, dtype=object)
+        return ensure_2d(g) * grad,
+
+    log_density.defvjp(log_density_fwd, log_density_bwd)
     return log_density
 
-
 class StanModel(Model):
-    """Class that encapsulates a PyStan model."""
+    """Class that encapsulates a BridgeStan model."""
 
-    def __init__(self, fit):
+    def __init__(self, bs_model):
         """
         Parameters
         ----------
         fit : `StanFit4model` object
         """
-        self._fit = fit
-        super().__init__(_make_stan_log_density(fit))
+        self._fit = bs_model
+        super().__init__(_make_stan_log_density(bs_model))
 
     def constrain(self, model_param):
+        return self._fit.param_constrain(model_param)
         return self._fit.constrain_pars(model_param)
